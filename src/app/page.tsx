@@ -74,20 +74,20 @@ export default function Home() {
     setScreenState('desktop')
   }, [])
 
-  const handleCloseDocument = useCallback(() => {
-    setScreenState('desktop')
-  }, [])
-
-  // The 3D mouse click — context-dependent action based on current screen
-  // state. This is the ONLY way to interact with the desktop (per user
-  // request): clicking the 3D mouse inserts the CD on desktop, closes the
-  // document in document view.
-  const handleMouseClick = useCallback(() => {
+  // CD case click — context-dependent:
+  //   On desktop  → insert the CD → Word document opens
+  //   On document → eject the CD → back to desktop
+  //   On other states → no-op
+  const handleInsertCD = useCallback(() => {
     setScreenState((s) => {
       if (s === 'desktop') return 'document'
       if (s === 'document') return 'desktop'
       return s
     })
+  }, [])
+
+  const handleCloseDocument = useCallback(() => {
+    setScreenState('desktop')
   }, [])
 
   return (
@@ -131,8 +131,8 @@ export default function Home() {
           screenState={screenState}
           onPowerToggle={handlePowerToggle}
           onLogin={handleLogin}
+          onInsertCD={handleInsertCD}
           onCloseDocument={handleCloseDocument}
-          onMouseClick={handleMouseClick}
         />
       </div>
 
@@ -146,11 +146,11 @@ export default function Home() {
           <span>
             {powered
               ? screenState === 'login'
-                ? 'TYPE YOUR PASSWORD — KEYS + HANDS SYNC'
+                ? 'TYPE ANY PASSWORD + ENTER'
                 : screenState === 'desktop'
-                ? 'CLICK THE MOUSE TO INSERT THE CD'
+                ? 'CLICK THE CD CASE TO INSERT IT'
                 : screenState === 'document'
-                ? 'CLICK THE MOUSE TO CLOSE'
+                ? 'CLICK THE CD CASE TO EJECT'
                 : 'BOOTING...'
               : 'CLICK THE POWER BUTTON ON THE MONITOR'}
           </span>

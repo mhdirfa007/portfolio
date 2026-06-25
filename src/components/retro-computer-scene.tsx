@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import * as THREE from 'three'
 import { ComputerScreen, ScreenState } from './computer-screen'
 import { CDCase } from './cd-case'
-import { inputState, lookupKeyPress, fingerIdToHand, type PressState } from '@/lib/input-state'
+import { inputState, type PressState } from '@/lib/input-state'
 
 /* ----------------------------------------------------------------------------
    CRT Monitor
@@ -479,13 +479,12 @@ function Key({
 }
 
 /* ----------------------------------------------------------------------------
-   Retro ball mouse + mousepad
-   The mouse is CLICKABLE — an HTML overlay button sits on top of the 3D
-   mouse body. Clicking the mouse is the primary way to interact with the
-   desktop (insert CD / close document), per user request.
+   Retro ball mouse + mousepad — decoration only (not clickable).
+   The CD case on the desk is the interactive element for inserting/removing
+   the CD, per user request.
 ---------------------------------------------------------------------------- */
 
-function RetroMouse({ onMouseClick }: { onMouseClick: () => void }) {
+function RetroMouse() {
   return (
     <group position={[2.6, -2.55, 2.6]} rotation={[0, -0.2, 0]}>
       {/* Mousepad */}
@@ -536,250 +535,10 @@ function RetroMouse({ onMouseClick }: { onMouseClick: () => void }) {
         <cylinderGeometry args={[0.025, 0.025, 0.5, 12]} />
         <meshStandardMaterial color="#666" roughness={0.7} />
       </mesh>
-
-      {/* Clickable HTML overlay button covering the mouse body.
-          Same pattern as the power button — reliable across browsers. */}
-      <Html position={[0, 0.3, 0.15]} center distanceFactor={2.5}>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            e.preventDefault()
-            onMouseClick()
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          aria-label="Click mouse — interact with desktop"
-          title="Click to interact"
-          style={{
-            width: '90px',
-            height: '90px',
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            padding: 0,
-            margin: 0,
-            outline: 'none',
-            borderRadius: '50%',
-            transition: 'box-shadow 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = '0 0 24px 6px rgba(255, 176, 0, 0.5)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = 'none'
-          }}
-        />
-      </Html>
     </group>
   )
 }
 
-/* ----------------------------------------------------------------------------
-   Cartoon hands — POV (first-person) typing on the keyboard.
-
-   Coordinate system reminder:
-     +X = right, +Y = up, +Z = toward camera (out of screen)
-     -Z = toward the monitor (away from camera)
-   So "fingertips pointing forward toward the keyboard" means -Z direction,
-   and "palm facing down" means the palm's flat side faces -Y (down).
-
-   Hand anatomy (palm-down, fingers-forward typing pose):
-     - Palm: flat box, top at +Y, bottom (palm side) at -Y
-     - Fingers: extend in -Z direction (toward monitor), curl down at tips
-     - Thumb: on the inner side (left hand: thumb on +X side; right hand: -X)
-     - Forearm + sleeve: extends back toward camera (+Z) and down, exiting frame
----------------------------------------------------------------------------- */
-
-function CartoonFinger({
-  position,
-  rotation = [0, 0, 0],
-  length = 0.4,
-  radius = 0.07,
-  color = '#f5c89a',
-}: {
-  position: [number, number, number]
-  rotation?: [number, number, number]
-  length?: number
-  radius?: number
-  color?: string
-}) {
-  return (
-    <mesh position={position} rotation={rotation} castShadow>
-      {/* capsuleGeometry: the cylinder part runs along the Y axis by default.
-          To make a finger point in -Z, we rotate it 90° around X. */}
-      <capsuleGeometry args={[radius, length, 6, 12]} />
-      <meshStandardMaterial color={color} roughness={0.7} />
-    </mesh>
-  )
-}
-
-function CartoonHand({
-  side = 'left',
-  position,
-}: {
-  side: 'left' | 'right'
-  position: [number, number, number]
-}) {
-  // For the LEFT hand: s=+1. For the RIGHT hand: s=-1 (mirrored).
-  // Thumb goes on the INNER side: left hand thumb on +X (right edge),
-  // right hand thumb on -X (left edge).
-  const s = side === 'left' ? 1 : -1
-  const skinColor = '#f5c89a'
-  const sleeveColor = '#5b3924' // warm brown sleeve
-  const cuffColor = '#3a2415'
-
-  return (
-    <group position={position}>
-      {/* ---- Forearm sleeve ----
-          Extends back toward the camera (+Z) and downward (-Y), exiting the
-          bottom of the frame. The sleeve is a capsule rotated to lie along
-          that diagonal. */}
-      <mesh
-        position={[0, -0.35, 0.55]}
-        rotation={[Math.PI / 2 - 0.5, 0, 0]}
-        castShadow
-      >
-        <capsuleGeometry args={[0.22, 0.9, 8, 16]} />
-        <meshStandardMaterial color={sleeveColor} roughness={0.85} />
-      </mesh>
-
-      {/* ---- Sleeve cuff (where the sleeve meets the wrist) ---- */}
-      <mesh position={[0, -0.05, 0.18]} rotation={[Math.PI / 2 - 0.4, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.24, 0.26, 0.16, 20]} />
-        <meshStandardMaterial color={cuffColor} roughness={0.7} />
-      </mesh>
-
-      {/* ---- Palm ----
-          Flat rounded box. Width along X, thickness along Y (thin), depth
-          along Z (palm-to-fingertip direction). Top face (+Y) is the back
-          of the hand; bottom face (-Y) is the palm side. Single mesh, no
-          extra bumps on the back. */}
-      <mesh position={[0, 0.05, -0.05]} castShadow>
-        <boxGeometry args={[0.42, 0.16, 0.45]} />
-        <meshStandardMaterial color={skinColor} roughness={0.7} />
-      </mesh>
-
-      {/* ---- Thumb ----
-          On the inner side of the hand (s * +X). Points forward (-Z) and
-          slightly inward. Positioned at palm mid-height so it doesn't poke
-          above the back of the hand.
-          Thumb is finger index 0 within this hand (but it doesn't animate
-          with key presses — only the 4 main fingers do). */}
-      <CartoonFinger
-        position={[s * 0.24, 0.0, 0.05]}
-        rotation={[Math.PI / 2 + 0.3, 0, s * -0.4]}
-        length={0.18}
-        radius={0.055}
-        color={skinColor}
-      />
-
-      {/* ---- Four fingers ----
-          Spread across the front edge of the palm (negative-Z side).
-          Each finger has two segments:
-            1) Base segment: lies nearly flat, extending in -Z (forward)
-            2) Tip segment: curls downward to "press" the keys — ANIMATED to
-               dip further down when this finger's corresponding key is pressed.
-          The 4 finger indices (0-3) map to the global fingerId via the
-          `side` prop: left hand fingers 0-3 = global fingerId 0-3,
-          right hand fingers 0-3 = global fingerId 4-7. */}
-      {[-0.15, -0.05, 0.05, 0.15].map((xOff, i) => (
-        <group key={i} position={[xOff, 0.0, -0.28]}>
-          {/* Base segment — extends forward (in -Z) from the front face of
-              the palm. y offset keeps the capsule centered at palm mid-height
-              so it doesn't poke above the back of the hand. */}
-          <CartoonFinger
-            position={[0, 0, -0.08]}
-            rotation={[Math.PI / 2 + 0.2, 0, 0]}
-            length={0.14}
-            radius={0.05}
-            color={skinColor}
-          />
-          {/* Tip segment — curls DOWN toward the keys. ANIMATED: dips further
-              when the corresponding finger's key is pressed. */}
-          <Fingertip
-            fingerIndex={i}
-            side={side}
-            basePosition={[0, -0.08, -0.18]}
-            baseRotation={[Math.PI / 2 + 1.4, 0, 0]}
-            length={0.1}
-            radius={0.04}
-            color={skinColor}
-          />
-        </group>
-      ))}
-    </group>
-  )
-}
-
-/* Fingertip — a CartoonFinger that watches inputState and dips down when its
-   corresponding finger's key is pressed. The dip is a ~150ms animation. */
-function Fingertip({
-  fingerIndex,
-  side,
-  basePosition,
-  baseRotation,
-  length,
-  radius,
-  color,
-}: {
-  fingerIndex: number
-  side: 'left' | 'right'
-  basePosition: [number, number, number]
-  baseRotation: [number, number, number]
-  length: number
-  radius: number
-  color: string
-}) {
-  const meshRef = useRef<THREE.Mesh>(null)
-  // Compute the global fingerId for this fingertip.
-  // Left hand: indices 0-3 → global 0-3
-  // Right hand: indices 0-3 → global 4-7
-  const globalFingerId = side === 'left' ? fingerIndex : fingerIndex + 4
-
-  useFrame(() => {
-    if (!meshRef.current) return
-    const press: PressState = inputState.current
-    if (!press.fingerId || press.fingerId !== globalFingerId) {
-      // Reset to base position
-      meshRef.current.position.y = basePosition[1]
-      return
-    }
-
-    // Animate: dip down by 0.06 for 150ms, then return.
-    const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - press.timestamp
-    const duration = 150
-    if (elapsed > duration) {
-      meshRef.current.position.y = basePosition[1]
-      return
-    }
-    // Half-sine curve: starts at 0, dips to -0.06 at midpoint, returns to 0
-    const t = elapsed / duration
-    const dip = Math.sin(t * Math.PI) * 0.06
-    meshRef.current.position.y = basePosition[1] - dip
-  })
-
-  return (
-    <mesh ref={meshRef} position={basePosition} rotation={baseRotation} castShadow>
-      <capsuleGeometry args={[radius, length, 6, 12]} />
-      <meshStandardMaterial color={color} roughness={0.7} />
-    </mesh>
-  )
-}
-
-function CartoonHandsPOV() {
-  return (
-    // Position the hands so the fingertips rest ON the home-row keys.
-    // Keyboard is at world (0, -2.55, 2.6). Keyboard base top at y ≈ -2.4,
-    // key caps add ~0.1, so key tops are at y ≈ -2.3 around z ≈ 2.6.
-    // Fingertips need to reach y ≈ -2.3. With the hand's local geometry,
-    // fingertips end up at local y ≈ -0.2 below the hand origin. So group
-    // y ≈ -2.1 puts fingertips at world y ≈ -2.3 — right on the keys.
-    // Hands are offset in X so each palm sits over its half of the keyboard.
-    <group position={[0, -2.25, 3.0]}>
-      <CartoonHand side="left" position={[-0.55, 0, 0]} />
-      <CartoonHand side="right" position={[0.55, 0, 0]} />
-    </group>
-  )
-}
 
 /* ----------------------------------------------------------------------------
    Lighting
@@ -853,15 +612,15 @@ export default function RetroComputerScene({
   screenState,
   onPowerToggle,
   onLogin,
+  onInsertCD,
   onCloseDocument,
-  onMouseClick,
 }: {
   powered: boolean
   screenState: ScreenState
   onPowerToggle: () => void
   onLogin: () => void
+  onInsertCD: () => void
   onCloseDocument: () => void
-  onMouseClick: () => void
 }) {
   return (
     <Canvas
@@ -890,9 +649,8 @@ export default function RetroComputerScene({
           <DesktopTower />
           <DeskSurface />
           <Keyboard />
-          <RetroMouse onMouseClick={onMouseClick} />
-          <CartoonHandsPOV />
-          <CDCase />
+          <RetroMouse />
+          <CDCase onInsert={onInsertCD} />
         </group>
 
         <OrbitControls

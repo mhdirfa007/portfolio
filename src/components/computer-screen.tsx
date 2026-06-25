@@ -146,21 +146,27 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
 
         {/* Password field + arrow button */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {/* type="password" shows native masked dots (•) as the user types.
+              The input autofocuses when the login screen appears (see the
+              useEffect with inputRef.current?.focus() above). */}
           <input
             ref={inputRef}
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
+            autoComplete="off"
             style={{
               width: '180px',
               padding: '6px 10px',
               fontSize: '14px',
               border: '1px solid rgba(255,255,255,0.5)',
-              background: 'rgba(255,255,255,0.9)',
+              background: 'rgba(255,255,255,0.95)',
               borderRadius: '2px',
               outline: 'none',
               fontFamily: 'Segoe UI, Tahoma, sans-serif',
+              letterSpacing: '2px',
+              color: '#000',
             }}
           />
           {/* Blue circular arrow button — Windows 7 style */}
@@ -280,12 +286,12 @@ function DesktopScreen() {
           maxWidth: '70%',
         }}
       >
-        <div style={{ fontSize: '32px', marginBottom: '8px' }}>🖱️</div>
+        <div style={{ fontSize: '32px', marginBottom: '8px' }}>💿</div>
         <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>
           Welcome, User!
         </div>
         <div style={{ fontSize: '12px', opacity: 0.9 }}>
-          Click the mouse on the desk to insert the CD
+          Click the CD case on the desk to view the resume
         </div>
       </div>
 
