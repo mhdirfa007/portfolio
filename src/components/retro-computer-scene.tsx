@@ -530,26 +530,22 @@ function CartoonHand({
       {/* ---- Palm ----
           Flat rounded box. Width along X, thickness along Y (thin), depth
           along Z (palm-to-fingertip direction). Top face (+Y) is the back
-          of the hand; bottom face (-Y) is the palm side. */}
+          of the hand; bottom face (-Y) is the palm side. Single mesh, no
+          extra bumps on the back. */}
       <mesh position={[0, 0.05, -0.05]} castShadow>
         <boxGeometry args={[0.42, 0.16, 0.45]} />
-        <meshStandardMaterial color={skinColor} roughness={0.7} />
-      </mesh>
-      {/* Soft round top (back of hand) */}
-      <mesh position={[0, 0.14, -0.05]} castShadow>
-        <capsuleGeometry args={[0.13, 0.18, 6, 12]} />
         <meshStandardMaterial color={skinColor} roughness={0.7} />
       </mesh>
 
       {/* ---- Thumb ----
           On the inner side of the hand (s * +X). Points forward (-Z) and
-          slightly inward. Rotated to lie mostly along -Z with a slight
-          downward curl. */}
+          slightly inward. Positioned at palm mid-height so it doesn't poke
+          above the back of the hand. */}
       <CartoonFinger
-        position={[s * 0.24, 0.04, 0.05]}
+        position={[s * 0.24, 0.0, 0.05]}
         rotation={[Math.PI / 2 + 0.3, 0, s * -0.4]}
         length={0.18}
-        radius={0.06}
+        radius={0.055}
         color={skinColor}
       />
 
@@ -558,15 +554,18 @@ function CartoonHand({
           Each finger has two segments:
             1) Base segment: lies nearly flat, extending in -Z (forward)
             2) Tip segment: curls downward to "press" the keys
-          The capsule is rotated +90° around X to point along Z. */}
+          The capsules are positioned at the FRONT face of the palm (not on
+          top of it) so they don't create bumps on the back of the hand. */}
       {[-0.15, -0.05, 0.05, 0.15].map((xOff, i) => (
-        <group key={i} position={[xOff, 0.08, -0.25]}>
-          {/* Base segment — extends forward (in -Z) from the knuckle, mostly flat */}
+        <group key={i} position={[xOff, 0.0, -0.28]}>
+          {/* Base segment — extends forward (in -Z) from the front face of
+              the palm. y offset keeps the capsule centered at palm mid-height
+              so it doesn't poke above the back of the hand. */}
           <CartoonFinger
             position={[0, 0, -0.08]}
             rotation={[Math.PI / 2 + 0.2, 0, 0]}
             length={0.14}
-            radius={0.055}
+            radius={0.05}
             color={skinColor}
           />
           {/* Tip segment — curls DOWN toward the keys (steeper angle so
@@ -575,7 +574,7 @@ function CartoonHand({
             position={[0, -0.08, -0.18]}
             rotation={[Math.PI / 2 + 1.4, 0, 0]}
             length={0.1}
-            radius={0.045}
+            radius={0.04}
             color={skinColor}
           />
         </group>
