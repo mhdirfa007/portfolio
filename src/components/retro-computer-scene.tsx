@@ -4,18 +4,32 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, RoundedBox, Html, useProgress } from '@react-three/drei'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import * as THREE from 'three'
-import { ResumeScreen } from './resume-screen'
+import { ComputerScreen, ScreenState } from './computer-screen'
+import { CDCase } from './cd-case'
 
 /* ----------------------------------------------------------------------------
    CRT Monitor
    - Body: RoundedBox (cream/beige plastic)
    - Front bezel: darker inset
    - Screen surface: dark plane (acts as the "frame" around the HTML content)
-   - Resume content: drei <Html transform> rendering the live React DOM
+   - Screen content: drei <Html transform> rendering the live React DOM
+     (boot screen → Windows 7 login → desktop → Word document)
    - Power button, knobs, brand badge, stand
 ---------------------------------------------------------------------------- */
 
-function CRTMonitor({ powered, onPowerToggle }: { powered: boolean; onPowerToggle: () => void }) {
+function CRTMonitor({
+  powered,
+  screenState,
+  onPowerToggle,
+  onLogin,
+  onCloseDocument,
+}: {
+  powered: boolean
+  screenState: ScreenState
+  onPowerToggle: () => void
+  onLogin: () => void
+  onCloseDocument: () => void
+}) {
   // Boot-up power-on animation (emissive flash → settle)
   const screenFaceMatRef = useRef<THREE.MeshStandardMaterial>(null)
   const glassRef = useRef<THREE.MeshBasicMaterial>(null)
@@ -71,12 +85,13 @@ function CRTMonitor({ powered, onPowerToggle }: { powered: boolean; onPowerToggl
         />
       </mesh>
 
-      {/* ---------- Live resume content rendered as DOM in 3D space ---------- */}
-      {/* drei <Html transform> renders the resume DOM natively in 3D space.
-          `distanceFactor` controls how big the HTML appears in world units:
-          smaller = bigger on screen, larger = smaller. Tuned so the 1024×768
-          resume fits exactly inside the 3.4×2.6 dark CRT screen frame.
-          Position is in front of the screen surface (z=1.74, screen at z=1.725). */}
+      {/* ---------- Live screen content rendered as DOM in 3D space ---------- */}
+      {/* drei <Html transform> renders the multi-state UI (boot/login/desktop/
+          document) natively in 3D space. distanceFactor tuned so the
+          1024×768 content fits exactly inside the 3.4×2.6 CRT screen frame.
+          pointerEvents: 'auto' only on states that need interaction (login
+          for the password field, document for the close button). Other states
+          use 'none' so the wrapper doesn't block clicks on the CD case etc. */}
       <Html
         transform
         occlude={false}
@@ -86,12 +101,16 @@ function CRTMonitor({ powered, onPowerToggle }: { powered: boolean; onPowerToggl
         style={{
           width: '1024px',
           height: '768px',
-          pointerEvents: 'none',
+          pointerEvents: screenState === 'login' || screenState === 'document' ? 'auto' : 'none',
           opacity: powered ? 1 : 0,
           transition: 'opacity 0.3s linear',
         }}
       >
-        <ResumeScreen powered={powered} />
+        <ComputerScreen
+          state={screenState}
+          onLogin={onLogin}
+          onCloseDocument={onCloseDocument}
+        />
       </Html>
 
       {/* Curved glass reflection overlay (subtle highlight) */}
@@ -668,10 +687,18 @@ function SceneLoader() {
 
 export default function RetroComputerScene({
   powered,
+  screenState,
   onPowerToggle,
+  onLogin,
+  onInsertCD,
+  onCloseDocument,
 }: {
   powered: boolean
+  screenState: ScreenState
   onPowerToggle: () => void
+  onLogin: () => void
+  onInsertCD: () => void
+  onCloseDocument: () => void
 }) {
   return (
     <Canvas
@@ -690,12 +717,19 @@ export default function RetroComputerScene({
         <CameraController powered={powered} />
 
         <group position={[0, 0, 0]}>
-          <CRTMonitor powered={powered} onPowerToggle={onPowerToggle} />
+          <CRTMonitor
+            powered={powered}
+            screenState={screenState}
+            onPowerToggle={onPowerToggle}
+            onLogin={onLogin}
+            onCloseDocument={onCloseDocument}
+          />
           <DesktopTower />
           <DeskSurface />
           <Keyboard />
           <RetroMouse />
           <CartoonHandsPOV />
+          <CDCase onInsert={onInsertCD} />
         </group>
 
         <OrbitControls
