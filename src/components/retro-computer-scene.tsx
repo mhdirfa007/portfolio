@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import * as THREE from 'three'
 import { ComputerScreen, ScreenState } from './computer-screen'
 import { CDCase } from './cd-case'
+import { inputState, lookupKeyPress, fingerIdToHand, type PressState } from '@/lib/input-state'
 
 /* ----------------------------------------------------------------------------
    CRT Monitor
@@ -334,11 +335,13 @@ function DeskSurface() {
 }
 
 /* ----------------------------------------------------------------------------
-   Retro keyboard — beige, matches the monitor + tower
+   Retro keyboard — beige, matches the monitor + tower.
+   Each key is a separate <Key> component that watches the shared inputState
+   and animates (dips down) when its corresponding physical key is pressed.
 ---------------------------------------------------------------------------- */
 
 function Keyboard() {
-  // Generate a 5-row x 14-col grid of keys for the main block
+  // Same layout as the 3D keyboard in input-state.ts (kept in sync)
   const keyRows = [
     ['`', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 'BSP'],
     ['TAB', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', '\\'],
@@ -389,14 +392,18 @@ function Keyboard() {
               x -= rowWidth / 2
               const z = -0.55 + rIdx * 0.27
               return (
-                <mesh
+                <Key
                   key={`${rIdx}-${cIdx}`}
+                  keyId={k}
                   position={[x + w / 2, 0, z]}
-                  castShadow
-                >
-                  <boxGeometry args={[w, 0.1, h]} />
-                  <meshStandardMaterial color="#f0ebde" roughness={0.55} />
-                </mesh>
+                  width={w}
+                  height={h}
+                  // For SPC (spacebar), only the first SPC instance responds to
+                  // presses — otherwise all 6 spacebar segments would dip together.
+                  // We pass row/col so each Key can decide if it's the "active" one.
+                  row={rIdx}
+                  col={cIdx}
+                />
               )
             })
           )}
@@ -412,11 +419,73 @@ function Keyboard() {
   )
 }
 
+/* Single key — watches inputState and dips down when its physical key is
+   pressed. The dip is a short ~150ms animation driven by useFrame. */
+function Key({
+  keyId,
+  position,
+  width,
+  height,
+  row,
+  col,
+}: {
+  keyId: string
+  position: [number, number, number]
+  width: number
+  height: number
+  row: number
+  col: number
+}) {
+  const meshRef = useRef<THREE.Mesh>(null)
+  const baseY = position[1]
+
+  useFrame(() => {
+    if (!meshRef.current) return
+    const press: PressState = inputState.current
+    if (!press.keyId) {
+      meshRef.current.position.y = baseY
+      return
+    }
+    // Check if this key is the one that was pressed.
+    // For SPC (spacebar), only the FIRST SPC instance (row 4, col 3) animates.
+    const isMyKey = press.keyId.toLowerCase() === keyId.toLowerCase()
+    const isMySpaceInstance = keyId === 'SPC' && row === 4 && col === 3
+    const isPressed = isMyKey && (keyId !== 'SPC' || isMySpaceInstance)
+
+    if (!isPressed) {
+      meshRef.current.position.y = baseY
+      return
+    }
+
+    // Animate: dip down by 0.04 for 150ms, then return.
+    const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - press.timestamp
+    const duration = 150
+    if (elapsed > duration) {
+      meshRef.current.position.y = baseY
+      return
+    }
+    // Half-sine curve: starts at 0, dips to -0.04 at midpoint, returns to 0
+    const t = elapsed / duration
+    const dip = Math.sin(t * Math.PI) * 0.04
+    meshRef.current.position.y = baseY - dip
+  })
+
+  return (
+    <mesh ref={meshRef} position={position} castShadow>
+      <boxGeometry args={[width, 0.1, height]} />
+      <meshStandardMaterial color="#f0ebde" roughness={0.55} />
+    </mesh>
+  )
+}
+
 /* ----------------------------------------------------------------------------
    Retro ball mouse + mousepad
+   The mouse is CLICKABLE — an HTML overlay button sits on top of the 3D
+   mouse body. Clicking the mouse is the primary way to interact with the
+   desktop (insert CD / close document), per user request.
 ---------------------------------------------------------------------------- */
 
-function RetroMouse() {
+function RetroMouse({ onMouseClick }: { onMouseClick: () => void }) {
   return (
     <group position={[2.6, -2.55, 2.6]} rotation={[0, -0.2, 0]}>
       {/* Mousepad */}
@@ -467,6 +536,39 @@ function RetroMouse() {
         <cylinderGeometry args={[0.025, 0.025, 0.5, 12]} />
         <meshStandardMaterial color="#666" roughness={0.7} />
       </mesh>
+
+      {/* Clickable HTML overlay button covering the mouse body.
+          Same pattern as the power button — reliable across browsers. */}
+      <Html position={[0, 0.3, 0.15]} center distanceFactor={2.5}>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            e.preventDefault()
+            onMouseClick()
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          aria-label="Click mouse — interact with desktop"
+          title="Click to interact"
+          style={{
+            width: '90px',
+            height: '90px',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+            margin: 0,
+            outline: 'none',
+            borderRadius: '50%',
+            transition: 'box-shadow 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow = '0 0 24px 6px rgba(255, 176, 0, 0.5)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = 'none'
+          }}
+        />
+      </Html>
     </group>
   )
 }
@@ -559,7 +661,9 @@ function CartoonHand({
       {/* ---- Thumb ----
           On the inner side of the hand (s * +X). Points forward (-Z) and
           slightly inward. Positioned at palm mid-height so it doesn't poke
-          above the back of the hand. */}
+          above the back of the hand.
+          Thumb is finger index 0 within this hand (but it doesn't animate
+          with key presses — only the 4 main fingers do). */}
       <CartoonFinger
         position={[s * 0.24, 0.0, 0.05]}
         rotation={[Math.PI / 2 + 0.3, 0, s * -0.4]}
@@ -572,9 +676,11 @@ function CartoonHand({
           Spread across the front edge of the palm (negative-Z side).
           Each finger has two segments:
             1) Base segment: lies nearly flat, extending in -Z (forward)
-            2) Tip segment: curls downward to "press" the keys
-          The capsules are positioned at the FRONT face of the palm (not on
-          top of it) so they don't create bumps on the back of the hand. */}
+            2) Tip segment: curls downward to "press" the keys — ANIMATED to
+               dip further down when this finger's corresponding key is pressed.
+          The 4 finger indices (0-3) map to the global fingerId via the
+          `side` prop: left hand fingers 0-3 = global fingerId 0-3,
+          right hand fingers 0-3 = global fingerId 4-7. */}
       {[-0.15, -0.05, 0.05, 0.15].map((xOff, i) => (
         <group key={i} position={[xOff, 0.0, -0.28]}>
           {/* Base segment — extends forward (in -Z) from the front face of
@@ -587,11 +693,13 @@ function CartoonHand({
             radius={0.05}
             color={skinColor}
           />
-          {/* Tip segment — curls DOWN toward the keys (steeper angle so
-              fingertips point mostly downward, pressing the key caps) */}
-          <CartoonFinger
-            position={[0, -0.08, -0.18]}
-            rotation={[Math.PI / 2 + 1.4, 0, 0]}
+          {/* Tip segment — curls DOWN toward the keys. ANIMATED: dips further
+              when the corresponding finger's key is pressed. */}
+          <Fingertip
+            fingerIndex={i}
+            side={side}
+            basePosition={[0, -0.08, -0.18]}
+            baseRotation={[Math.PI / 2 + 1.4, 0, 0]}
             length={0.1}
             radius={0.04}
             color={skinColor}
@@ -599,6 +707,61 @@ function CartoonHand({
         </group>
       ))}
     </group>
+  )
+}
+
+/* Fingertip — a CartoonFinger that watches inputState and dips down when its
+   corresponding finger's key is pressed. The dip is a ~150ms animation. */
+function Fingertip({
+  fingerIndex,
+  side,
+  basePosition,
+  baseRotation,
+  length,
+  radius,
+  color,
+}: {
+  fingerIndex: number
+  side: 'left' | 'right'
+  basePosition: [number, number, number]
+  baseRotation: [number, number, number]
+  length: number
+  radius: number
+  color: string
+}) {
+  const meshRef = useRef<THREE.Mesh>(null)
+  // Compute the global fingerId for this fingertip.
+  // Left hand: indices 0-3 → global 0-3
+  // Right hand: indices 0-3 → global 4-7
+  const globalFingerId = side === 'left' ? fingerIndex : fingerIndex + 4
+
+  useFrame(() => {
+    if (!meshRef.current) return
+    const press: PressState = inputState.current
+    if (!press.fingerId || press.fingerId !== globalFingerId) {
+      // Reset to base position
+      meshRef.current.position.y = basePosition[1]
+      return
+    }
+
+    // Animate: dip down by 0.06 for 150ms, then return.
+    const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - press.timestamp
+    const duration = 150
+    if (elapsed > duration) {
+      meshRef.current.position.y = basePosition[1]
+      return
+    }
+    // Half-sine curve: starts at 0, dips to -0.06 at midpoint, returns to 0
+    const t = elapsed / duration
+    const dip = Math.sin(t * Math.PI) * 0.06
+    meshRef.current.position.y = basePosition[1] - dip
+  })
+
+  return (
+    <mesh ref={meshRef} position={basePosition} rotation={baseRotation} castShadow>
+      <capsuleGeometry args={[radius, length, 6, 12]} />
+      <meshStandardMaterial color={color} roughness={0.7} />
+    </mesh>
   )
 }
 
@@ -690,15 +853,15 @@ export default function RetroComputerScene({
   screenState,
   onPowerToggle,
   onLogin,
-  onInsertCD,
   onCloseDocument,
+  onMouseClick,
 }: {
   powered: boolean
   screenState: ScreenState
   onPowerToggle: () => void
   onLogin: () => void
-  onInsertCD: () => void
   onCloseDocument: () => void
+  onMouseClick: () => void
 }) {
   return (
     <Canvas
@@ -727,9 +890,9 @@ export default function RetroComputerScene({
           <DesktopTower />
           <DeskSurface />
           <Keyboard />
-          <RetroMouse />
+          <RetroMouse onMouseClick={onMouseClick} />
           <CartoonHandsPOV />
-          <CDCase onInsert={onInsertCD} />
+          <CDCase />
         </group>
 
         <OrbitControls

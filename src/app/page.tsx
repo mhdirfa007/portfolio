@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useState, useEffect, useCallback } from 'react'
+import { triggerKeyPress, keyEventToKeyId, lookupKeyPress } from '@/lib/input-state'
 
 // Dynamically import the 3D scene to avoid SSR issues with Three.js
 const RetroComputerScene = dynamic(
@@ -53,16 +54,40 @@ export default function Home() {
     }
   }, [powered, screenState])
 
+  // ---- Keyboard listener: when on the login screen, every real keypress
+  // triggers the corresponding 3D key + cartoon finger animation. ----
+  useEffect(() => {
+    if (screenState !== 'login') return
+    const handler = (e: KeyboardEvent) => {
+      const keyId = keyEventToKeyId(e)
+      if (!keyId) return
+      const lookup = lookupKeyPress(keyId)
+      if (!lookup) return
+      // Trigger the 3D key + finger animation
+      triggerKeyPress(keyId, lookup.fingerId)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [screenState])
+
   const handleLogin = useCallback(() => {
     setScreenState('desktop')
   }, [])
 
-  const handleInsertCD = useCallback(() => {
-    setScreenState('document')
-  }, [])
-
   const handleCloseDocument = useCallback(() => {
     setScreenState('desktop')
+  }, [])
+
+  // The 3D mouse click — context-dependent action based on current screen
+  // state. This is the ONLY way to interact with the desktop (per user
+  // request): clicking the 3D mouse inserts the CD on desktop, closes the
+  // document in document view.
+  const handleMouseClick = useCallback(() => {
+    setScreenState((s) => {
+      if (s === 'desktop') return 'document'
+      if (s === 'document') return 'desktop'
+      return s
+    })
   }, [])
 
   return (
@@ -106,8 +131,8 @@ export default function Home() {
           screenState={screenState}
           onPowerToggle={handlePowerToggle}
           onLogin={handleLogin}
-          onInsertCD={handleInsertCD}
           onCloseDocument={handleCloseDocument}
+          onMouseClick={handleMouseClick}
         />
       </div>
 
@@ -121,11 +146,11 @@ export default function Home() {
           <span>
             {powered
               ? screenState === 'login'
-                ? 'TYPE ANY PASSWORD + ENTER'
+                ? 'TYPE YOUR PASSWORD — KEYS + HANDS SYNC'
                 : screenState === 'desktop'
-                ? 'CLICK THE CD CASE ON THE DESK'
+                ? 'CLICK THE MOUSE TO INSERT THE CD'
                 : screenState === 'document'
-                ? 'VIEWING RESUME.DOCX'
+                ? 'CLICK THE MOUSE TO CLOSE'
                 : 'BOOTING...'
               : 'CLICK THE POWER BUTTON ON THE MONITOR'}
           </span>
@@ -134,3 +159,4 @@ export default function Home() {
     </main>
   )
 }
+

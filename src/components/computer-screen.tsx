@@ -280,12 +280,12 @@ function DesktopScreen() {
           maxWidth: '70%',
         }}
       >
-        <div style={{ fontSize: '32px', marginBottom: '8px' }}>💿</div>
+        <div style={{ fontSize: '32px', marginBottom: '8px' }}>🖱️</div>
         <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>
           Welcome, User!
         </div>
         <div style={{ fontSize: '12px', opacity: 0.9 }}>
-          Click the CD case on the desk to view the resume
+          Click the mouse on the desk to insert the CD
         </div>
       </div>
 
