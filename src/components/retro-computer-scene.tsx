@@ -1,8 +1,8 @@
 'use client'
 
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, RoundedBox, Html, useProgress } from '@react-three/drei'
-import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
+import { useEffect, useRef, useState, Suspense } from 'react'
 import * as THREE from 'three'
 import { ComputerScreen, ScreenState } from './computer-screen'
 import { CDCase } from './cd-case'
@@ -572,25 +572,6 @@ function Lighting() {
 }
 
 /* ----------------------------------------------------------------------------
-   Camera rig — slightly elevated, looking down toward keyboard for POV feel
----------------------------------------------------------------------------- */
-
-function CameraController({ powered }: { powered: boolean }) {
-  const { camera } = useThree()
-  // Frame the whole scene: monitor + desk + keyboard + hands
-  const idlePos = useMemo(() => new THREE.Vector3(0, 0.8, 11), [])
-  const focusPos = useMemo(() => new THREE.Vector3(0, 0.4, 9.5), [])
-
-  useFrame((_, delta) => {
-    const goal = powered ? focusPos : idlePos
-    camera.position.lerp(goal, delta * 0.6)
-    // Look at center of monitor screen (slightly above desk level)
-    camera.lookAt(0, -0.4, 0)
-  })
-  return null
-}
-
-/* ----------------------------------------------------------------------------
    Loader
 ---------------------------------------------------------------------------- */
 
@@ -625,7 +606,7 @@ export default function RetroComputerScene({
   return (
     <Canvas
       shadows
-      camera={{ position: [0, 0, 11], fov: 42, near: 0.1, far: 100 }}
+      camera={{ position: [0, 0.4, 9.5], fov: 42, near: 0.1, far: 100 }}
       gl={{
         antialias: true,
         toneMapping: THREE.ACESFilmicToneMapping,
@@ -636,7 +617,6 @@ export default function RetroComputerScene({
     >
       <Suspense fallback={<SceneLoader />}>
         <Lighting />
-        <CameraController powered={powered} />
 
         <group position={[0, 0, 0]}>
           <CRTMonitor
@@ -663,7 +643,7 @@ export default function RetroComputerScene({
           maxAzimuthAngle={Math.PI * 0.6}
           enableDamping
           dampingFactor={0.08}
-          target={[0, 0, 0]}
+          target={[0, -0.4, 0]}
         />
       </Suspense>
     </Canvas>
