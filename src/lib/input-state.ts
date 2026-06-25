@@ -158,3 +158,20 @@ export function updateMousePos(x: number, y: number, active: boolean) {
   mousePosState.current = { x, y, active }
 }
 
+
+/* ============================================================================
+   Mouse click pulse
+   A module-level timestamp that pulses each time the 3D mouse is clicked.
+   The right cartoon hand reads this in useFrame to press its index finger
+   down briefly (mirroring the mouse button press), without re-renders.
+============================================================================ */
+
+export const mouseClickState: { current: { timestamp: number } } = {
+  current: { timestamp: 0 },
+}
+
+export function triggerMouseClick() {
+  mouseClickState.current = {
+    timestamp: typeof performance !== 'undefined' ? performance.now() : Date.now(),
+  }
+}

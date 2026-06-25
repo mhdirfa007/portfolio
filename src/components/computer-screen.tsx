@@ -16,17 +16,23 @@ export type ScreenState = 'boot' | 'login' | 'desktop' | 'document'
 
 export function ComputerScreen({
   state,
+  floppyInserted,
   onLogin,
   onCloseDocument,
+  onPrint,
+  onOpenResume,
 }: {
   state: ScreenState
+  floppyInserted: boolean
   onLogin: () => void
   onCloseDocument: () => void
+  onPrint: () => void
+  onOpenResume: () => void
 }) {
   if (state === 'boot') return <BootScreen />
   if (state === 'login') return <LoginScreen onLogin={onLogin} />
-  if (state === 'desktop') return <DesktopScreen />
-  if (state === 'document') return <ResumeDocument onClose={onCloseDocument} />
+  if (state === 'desktop') return <DesktopScreen floppyInserted={floppyInserted} onOpenResume={onOpenResume} />
+  if (state === 'document') return <ResumeDocument onClose={onCloseDocument} onPrint={onPrint} />
   return null
 }
 
@@ -100,9 +106,10 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
   return (
     <div
       style={{
-        ...screenBase('#1d3b8e'),
+        ...screenBase('#0a4d8c'),
+        // Authentic Windows 7 "bliss"-style blue gradient sky
         background:
-          'linear-gradient(180deg, #4a8af0 0%, #2a5fb5 40%, #1d3b8e 100%)',
+          'radial-gradient(ellipse 120% 90% at 50% 38%, #5fa8e8 0%, #3a82d6 32%, #2160b8 62%, #14418f 100%)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -110,45 +117,74 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
         padding: '40px',
       }}
     >
+      {/* ---- Curved light streaks across the sky (Windows 7 logon swooshes) ---- */}
+      <svg
+        viewBox="0 0 1024 768"
+        preserveAspectRatio="none"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', opacity: 0.55 }}
+      >
+        <defs>
+          <linearGradient id="swoosh" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="rgba(255,255,255,0)" />
+            <stop offset="50%" stopColor="rgba(255,255,255,0.45)" />
+            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+          </linearGradient>
+        </defs>
+        <path d="M -50 210 C 300 120, 760 150, 1080 250" stroke="url(#swoosh)" strokeWidth="2" fill="none" />
+        <path d="M -50 250 C 320 170, 780 200, 1080 300" stroke="url(#swoosh)" strokeWidth="1.5" fill="none" opacity="0.7" />
+        <path d="M 560 360 C 680 380, 820 400, 1080 380" stroke="url(#swoosh)" strokeWidth="1.5" fill="none" opacity="0.6" />
+      </svg>
+      {/* Small green Windows-flag glints near center-right (decorative) */}
+      <div style={{ position: 'absolute', top: '46%', left: '63%', fontSize: '14px', opacity: 0.5, filter: 'drop-shadow(0 0 4px rgba(120,220,120,0.7))' }}>🌿</div>
+
       {/* User avatar + name + password field — centered */}
       <div
         style={{
+          position: 'relative',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '12px',
+          gap: '10px',
           transform: shake ? 'translateX(-8px)' : 'translateX(0)',
           transition: 'transform 0.1s',
         }}
       >
-        {/* Avatar — orange flower on light background (Windows 7 default style) */}
+        {/* Avatar — framed flower tile, Windows 7 default user picture style */}
         <div
           style={{
-            width: '80px',
-            height: '80px',
-            borderRadius: '6px',
-            background: 'linear-gradient(135deg, #f5d488 0%, #e8a830 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '48px',
-            border: '2px solid rgba(255,255,255,0.4)',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            width: '92px',
+            height: '92px',
+            borderRadius: '4px',
+            padding: '4px',
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(210,225,245,0.85) 100%)',
+            border: '1px solid rgba(255,255,255,0.9)',
+            boxShadow: '0 6px 16px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(120,150,190,0.5)',
           }}
         >
-          🌼
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              borderRadius: '2px',
+              background: 'linear-gradient(135deg, #fbe9c0 0%, #f3c969 45%, #e8a32b 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '52px',
+              lineHeight: 1,
+            }}
+          >
+            🌻
+          </div>
         </div>
 
         {/* User name */}
-        <div style={{ color: '#ffffff', fontSize: '18px', fontWeight: 600, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
+        <div style={{ color: '#ffffff', fontSize: '20px', fontWeight: 500, textShadow: '0 1px 4px rgba(0,0,0,0.55)', fontFamily: 'Segoe UI, Tahoma, sans-serif' }}>
           User
         </div>
 
         {/* Password field + arrow button */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {/* type="password" shows native masked dots (•) as the user types.
-              The input autofocuses when the login screen appears (see the
-              useEffect with inputRef.current?.focus() above). */}
+        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           <input
             ref={inputRef}
             type="password"
@@ -157,16 +193,17 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
             placeholder="Password"
             autoComplete="off"
             style={{
-              width: '180px',
-              padding: '6px 10px',
+              width: '172px',
+              padding: '5px 10px',
               fontSize: '14px',
-              border: '1px solid rgba(255,255,255,0.5)',
-              background: 'rgba(255,255,255,0.95)',
-              borderRadius: '2px',
+              border: '1px solid #8fb4d8',
+              background: 'rgba(255,255,255,0.96)',
+              borderRadius: '3px',
               outline: 'none',
               fontFamily: 'Segoe UI, Tahoma, sans-serif',
               letterSpacing: '2px',
               color: '#000',
+              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.15)',
             }}
           />
           {/* Blue circular arrow button — Windows 7 style */}
@@ -174,58 +211,137 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
             type="submit"
             aria-label="Log in"
             style={{
-              width: '28px',
-              height: '28px',
+              width: '30px',
+              height: '30px',
               borderRadius: '50%',
-              border: '1px solid rgba(255,255,255,0.6)',
-              background: 'linear-gradient(180deg, #6ba3f5 0%, #2a5fb5 100%)',
+              border: '1px solid #cfe2f5',
+              background: 'radial-gradient(circle at 50% 30%, #bfe0ff 0%, #5a9be0 45%, #2a6bc0 100%)',
               color: 'white',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '14px',
+              fontSize: '15px',
               padding: 0,
+              boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
             }}
           >
             ➜
           </button>
         </form>
         {shake && (
-          <div style={{ color: '#ffcccc', fontSize: '12px' }}>Please enter a password (any will do)</div>
+          <div style={{ color: '#ffe0e0', fontSize: '12px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+            Please enter a password (any will do)
+          </div>
         )}
-      </div>
-
-      {/* Windows 7 logo at the bottom */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: '20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          color: 'rgba(255,255,255,0.85)',
-          fontSize: '14px',
-          fontFamily: 'Segoe UI, Tahoma, sans-serif',
-          textShadow: '0 1px 2px rgba(0,0,0,0.4)',
-        }}
-      >
-        <span style={{ fontSize: '18px' }}>🪟</span>
-        <span>Windows 7</span>
       </div>
 
       {/* Hint text */}
       <div
         style={{
           position: 'absolute',
-          bottom: '50px',
-          color: 'rgba(255,255,255,0.6)',
+          bottom: '78px',
+          color: 'rgba(255,255,255,0.7)',
           fontSize: '11px',
           fontFamily: 'Segoe UI, Tahoma, sans-serif',
+          textShadow: '0 1px 2px rgba(0,0,0,0.45)',
         }}
       >
         Type any password and press Enter to log in
       </div>
+
+      {/* Windows 7 logo + edition at the bottom-center */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: '36px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontFamily: 'Segoe UI, Tahoma, sans-serif',
+          textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+        }}
+      >
+        {/* Colorful 4-pane Windows flag */}
+        <WindowsFlag />
+        <span style={{ color: '#ffffff', fontSize: '22px', fontWeight: 300, letterSpacing: '0.5px' }}>
+          Windows<span style={{ fontSize: '13px', verticalAlign: 'super', marginLeft: '2px' }}>7</span>
+        </span>
+      </div>
+
+      {/* Accessibility (Ease of Access) button — bottom left */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: '14px',
+          left: '16px',
+          width: '30px',
+          height: '30px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle at 50% 35%, #eaf2fb 0%, #b9d2ee 55%, #7da6d6 100%)',
+          border: '1px solid rgba(255,255,255,0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '15px',
+          color: '#1a3a6a',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+        }}
+        title="Ease of Access"
+      >
+        ⊙
+      </div>
+
+      {/* Power / shut down button — bottom right */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: '14px',
+          right: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          background: 'linear-gradient(180deg, #d24a4a 0%, #a82424 100%)',
+          border: '1px solid rgba(255,255,255,0.5)',
+          borderRadius: '4px',
+          height: '30px',
+          padding: '0 8px',
+          gap: '6px',
+          color: 'white',
+          fontSize: '13px',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.45)',
+        }}
+        title="Shut down"
+      >
+        <span style={{ fontSize: '14px' }}>⏻</span>
+        <span style={{ fontSize: '8px', opacity: 0.85 }}>▸</span>
+      </div>
+    </div>
+  )
+}
+
+/* Small colorful 4-pane Windows flag used on the login + taskbar. */
+function WindowsFlag() {
+  const pane = (bg: string): React.CSSProperties => ({
+    width: '11px',
+    height: '11px',
+    background: bg,
+    borderRadius: '1px',
+  })
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '11px 11px',
+        gridTemplateRows: '11px 11px',
+        gap: '2px',
+        transform: 'perspective(60px) rotateY(-12deg)',
+        filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))',
+      }}
+    >
+      <div style={pane('#f04e4e')} />
+      <div style={pane('#7bc043')} />
+      <div style={pane('#3aa0e8')} />
+      <div style={pane('#f5b50a')} />
     </div>
   )
 }
@@ -234,100 +350,194 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
    Desktop — simple Windows 7 desktop with a hint to insert the CD
 ---------------------------------------------------------------------------- */
 
-function DesktopScreen() {
+function DesktopScreen({
+  floppyInserted,
+  onOpenResume,
+}: {
+  floppyInserted: boolean
+  onOpenResume: () => void
+}) {
+  const [clock, setClock] = useState('')
+
+  useEffect(() => {
+    const update = () => {
+      const d = new Date()
+      setClock(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+    }
+    update()
+    const id = setInterval(update, 10000)
+    return () => clearInterval(id)
+  }, [])
+
+  // Desktop application icons (decorative — navigation is via the 3D mouse).
+  const apps: { icon: string; label: string }[] = [
+    { icon: '💻', label: 'My Computer' },
+    { icon: '🗑️', label: 'Recycle Bin' },
+    { icon: '📁', label: 'My Documents' },
+    { icon: '📄', label: 'Resume.docx' },
+    { icon: '📝', label: 'Notepad' },
+    { icon: '🌐', label: 'Internet' },
+    { icon: '🎨', label: 'Paint' },
+    { icon: '🎵', label: 'Media Player' },
+  ]
+
   return (
     <div
       style={{
         ...screenBase('#0a5a2a'),
         background:
           'linear-gradient(180deg, #2d8c4e 0%, #1a6e3a 50%, #0a4a20 100%)',
-        padding: '30px',
+        padding: '18px',
         position: 'relative',
       }}
     >
-      {/* Desktop icon: My Computer */}
+      {/* ---- Desktop app icons (two columns) ---- */}
       <div
         style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
+          display: 'grid',
+          gridTemplateColumns: '92px 92px',
+          gridAutoRows: '86px',
           gap: '4px',
-          width: '80px',
         }}
       >
-        <div style={{ fontSize: '40px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))' }}>💻</div>
-        <div
-          style={{
-            color: 'white',
-            fontSize: '12px',
-            textAlign: 'center',
-            fontFamily: 'Segoe UI, Tahoma, sans-serif',
-            textShadow: '0 1px 2px rgba(0,0,0,0.8)',
-          }}
-        >
-          My Computer
-        </div>
+        {apps.map((a) => {
+          const isResume = a.label === 'Resume.docx'
+          const clickable = isResume && floppyInserted
+          return (
+            <div
+              key={a.label}
+              onClick={clickable ? () => onOpenResume() : undefined}
+              onPointerDown={clickable ? (e) => e.stopPropagation() : undefined}
+              title={isResume ? (floppyInserted ? 'Open Resume.docx' : 'Insert the disk to load') : a.label}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '6px 2px',
+                borderRadius: '4px',
+                cursor: clickable ? 'pointer' : 'default',
+                pointerEvents: clickable ? 'auto' : 'none',
+                background: clickable ? 'rgba(80,140,255,0.28)' : 'transparent',
+                border: clickable ? '1px solid rgba(140,190,255,0.6)' : '1px solid transparent',
+                boxShadow: clickable ? '0 0 12px rgba(90,150,255,0.5)' : 'none',
+                opacity: isResume && !floppyInserted ? 0.4 : 1,
+              }}
+            >
+              <div style={{ fontSize: '38px', filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.5))' }}>{a.icon}</div>
+              <div
+                style={{
+                  color: 'white',
+                  fontSize: '11px',
+                  textAlign: 'center',
+                  fontFamily: 'Segoe UI, Tahoma, sans-serif',
+                  textShadow: '0 1px 2px rgba(0,0,0,0.9)',
+                  lineHeight: 1.1,
+                }}
+              >
+                {a.label}
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {/* Hint to insert CD — centered */}
       <div
         style={{
           position: 'absolute',
-          top: '50%',
-          left: '50%',
+          top: '46%',
+          left: '54%',
           transform: 'translate(-50%, -50%)',
-          background: 'rgba(0,0,0,0.6)',
+          background: 'rgba(0,0,0,0.55)',
           border: '1px solid rgba(255,255,255,0.3)',
           borderRadius: '6px',
-          padding: '20px 30px',
+          padding: '16px 26px',
           color: 'white',
           fontFamily: 'Segoe UI, Tahoma, sans-serif',
           textAlign: 'center',
-          maxWidth: '70%',
+          maxWidth: '60%',
         }}
       >
-        <div style={{ fontSize: '32px', marginBottom: '8px' }}>💿</div>
-        <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>
-          Welcome, User!
-        </div>
-        <div style={{ fontSize: '12px', opacity: 0.9 }}>
-          Click the CD case on the desk to view the resume
+        <div style={{ fontSize: '28px', marginBottom: '6px' }}>{floppyInserted ? '📄' : '💾'}</div>
+        <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>Welcome, User!</div>
+        <div style={{ fontSize: '11px', opacity: 0.9 }}>
+          {floppyInserted
+            ? 'Resume disk loaded — opening Resume.docx…'
+            : 'Insert the floppy disk (on the desk) to load the Resume'}
         </div>
       </div>
 
-      {/* Taskbar at the bottom */}
+      {/* ---- Taskbar ---- */}
       <div
         style={{
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
-          height: '28px',
-          background: 'linear-gradient(180deg, rgba(40,80,160,0.95) 0%, rgba(20,40,100,0.95) 100%)',
-          borderTop: '1px solid rgba(255,255,255,0.3)',
+          height: '34px',
+          background: 'linear-gradient(180deg, rgba(40,90,170,0.96) 0%, rgba(16,40,96,0.96) 100%)',
+          borderTop: '1px solid rgba(255,255,255,0.35)',
           display: 'flex',
           alignItems: 'center',
           padding: '0 8px',
           gap: '8px',
         }}
       >
-        {/* Start button */}
+        {/* Start button with Windows flag */}
         <div
           style={{
-            background: 'linear-gradient(180deg, #4a9a4a 0%, #2a7a2a 100%)',
-            borderRadius: '3px',
-            padding: '3px 10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: 'linear-gradient(180deg, #58b85a 0%, #2f8a30 100%)',
+            borderRadius: '4px',
+            padding: '4px 12px',
+            color: 'white',
+            fontSize: '12px',
+            fontFamily: 'Segoe UI, Tahoma, sans-serif',
+            fontWeight: 700,
+            border: '1px solid rgba(255,255,255,0.45)',
+          }}
+        >
+          <WindowsFlag />
+          <span>Start</span>
+        </div>
+        {/* Quick launch / running apps */}
+        <div style={{ display: 'flex', gap: '4px', marginLeft: '4px' }}>
+          {['🌐', '📄', '🎵'].map((i, idx) => (
+            <div
+              key={idx}
+              style={{
+                width: '26px',
+                height: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '14px',
+                background: 'rgba(255,255,255,0.12)',
+                border: '1px solid rgba(255,255,255,0.25)',
+                borderRadius: '3px',
+              }}
+            >
+              {i}
+            </div>
+          ))}
+        </div>
+        {/* Clock */}
+        <div
+          style={{
+            marginLeft: 'auto',
             color: 'white',
             fontSize: '11px',
             fontFamily: 'Segoe UI, Tahoma, sans-serif',
-            fontWeight: 600,
-            border: '1px solid rgba(255,255,255,0.4)',
+            background: 'rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: '3px',
+            padding: '3px 8px',
           }}
         >
-          ⊞ Start
-        </div>
-        <div style={{ color: 'white', fontSize: '11px', fontFamily: 'Segoe UI, Tahoma, sans-serif', opacity: 0.7 }}>
-          Desktop
+          {clock}
         </div>
       </div>
     </div>
@@ -339,11 +549,9 @@ function DesktopScreen() {
    a white document page showing the resume content.
 ---------------------------------------------------------------------------- */
 
-function ResumeDocument({ onClose }: { onClose: () => void }) {
-  // Print / download the resume as a self-contained HTML file.
-  // We generate a printable HTML document with all the resume content and
-  // trigger an automatic download. The file can be opened in any browser and
-  // printed to PDF from there if needed.
+function ResumeDocument({ onClose, onPrint }: { onClose: () => void; onPrint: () => void }) {
+  // Print / download the resume as a self-contained HTML file AND trigger the
+  // in-world printer animation + held-paper close-up (via onPrint).
   const handlePrint = () => {
     const html = generatePrintableResume()
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
@@ -356,6 +564,8 @@ function ResumeDocument({ onClose }: { onClose: () => void }) {
     document.body.removeChild(a)
     // Revoke the URL after a short delay to ensure the download starts
     setTimeout(() => URL.revokeObjectURL(url), 1000)
+    // Kick off the printer dispense + held-paper view
+    onPrint()
   }
 
   return (
@@ -442,11 +652,13 @@ function ResumeDocument({ onClose }: { onClose: () => void }) {
       <div
         style={{
           flex: 1,
-          overflow: 'auto',
+          overflowY: 'scroll',
+          overflowX: 'hidden',
           background: '#888',
-          padding: '10px',
+          padding: '10px 10px 60px',
           display: 'flex',
           justifyContent: 'center',
+          alignItems: 'flex-start',
         }}
       >
         <div

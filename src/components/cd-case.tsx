@@ -32,81 +32,88 @@ export function CDCase({ onInsert }: { onInsert: () => void }) {
         <meshStandardMaterial color="#1a2a5a" roughness={0.7} />
       </mesh>
 
-      {/* Single HTML overlay containing BOTH the label text and the click
-          button. Using one Html element avoids the label wrapper covering
-          the button wrapper (which was blocking clicks). The button is
-          positioned absolutely over the label so clicks register on the
-          button, while the label text shows through. */}
-      <Html position={[0, 0.05, 0.08]} center distanceFactor={2.2}>
-        <div
-          style={{
-            position: 'relative',
-            width: '200px',
-            height: '180px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-            padding: '12px',
-            boxSizing: 'border-box',
-            // The wrapper itself doesn't capture pointer events — only the
-            // button inside it does.
-            pointerEvents: 'none',
-            userSelect: 'none',
-          }}
-        >
-          {/* Label text (non-interactive) */}
+      {/* ---- The CD disc itself, sitting in the open case ---- */}
+      <group position={[0.05, 0.0, 0.075]} rotation={[0, 0, 0]}>
+        {/* Disc body — silver, slightly reflective */}
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.6, 0.6, 0.012, 48]} />
+          <meshStandardMaterial color="#d9dde3" roughness={0.22} metalness={0.85} />
+        </mesh>
+        {/* Iridescent data-ring tint overlay */}
+        <mesh position={[0, 0, 0.008]}>
+          <ringGeometry args={[0.18, 0.58, 48]} />
+          <meshStandardMaterial
+            color="#bfe3ff"
+            roughness={0.15}
+            metalness={0.9}
+            transparent
+            opacity={0.35}
+            side={2}
+          />
+        </mesh>
+        {/* Center hub ring */}
+        <mesh position={[0, 0, 0.009]}>
+          <ringGeometry args={[0.1, 0.18, 32]} />
+          <meshStandardMaterial color="#9aa0a8" roughness={0.4} metalness={0.6} side={2} />
+        </mesh>
+        {/* Center hole */}
+        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.002]}>
+          <cylinderGeometry args={[0.1, 0.1, 0.02, 32]} />
+          <meshStandardMaterial color="#1a2a5a" roughness={0.7} />
+        </mesh>
+
+        {/* Disc label text (printed on the disc face) */}
+        <Html position={[0, 0, 0.02]} center distanceFactor={2.2} pointerEvents="none">
           <div
             style={{
+              width: '150px',
               textAlign: 'center',
-              color: '#ffb000',
+              color: '#1a2a5a',
               fontFamily: '"Courier New", monospace',
               pointerEvents: 'none',
+              userSelect: 'none',
+              lineHeight: '1.15',
             }}
           >
-            <div style={{ fontSize: '10px', opacity: 0.7, marginBottom: '4px' }}>📂 PORTFOLIO CD-ROM</div>
-            <div style={{ fontSize: '14px', fontWeight: 'bold', lineHeight: '1.2', letterSpacing: '0.5px' }}>
-              MOHAMED IRFAN
-            </div>
-            <div style={{ fontSize: '9px', opacity: 0.8, marginTop: '4px' }}>RESUME</div>
-            <div style={{ fontSize: '8px', opacity: 0.5, marginTop: '6px' }}>─ click to insert ─</div>
+            <div style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.5px' }}>MOHAMED</div>
+            <div style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.5px' }}>IRFAN</div>
+            <div style={{ height: '26px' }} />
+            <div style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '1px' }}>RESUME</div>
           </div>
+        </Html>
+      </group>
 
-          {/* Click button — covers the whole label area, captures the click */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              e.preventDefault()
-              onInsert()
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            aria-label="Click CD — insert / eject"
-            title="Click to insert / eject the CD"
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-              margin: 0,
-              outline: 'none',
-              borderRadius: '6px',
-              transition: 'box-shadow 0.2s',
-              pointerEvents: 'auto',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 0 24px 6px rgba(255, 176, 0, 0.5)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = 'none'
-            }}
-          />
-        </div>
+      {/* Click button — covers the whole case front, captures the click */}
+      <Html position={[0, 0.05, 0.1]} center distanceFactor={2.2}>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            e.preventDefault()
+            onInsert()
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          aria-label="Click CD — insert / eject"
+          title="Click to insert / eject the CD"
+          style={{
+            width: '180px',
+            height: '190px',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+            margin: 0,
+            outline: 'none',
+            borderRadius: '6px',
+            transition: 'box-shadow 0.2s',
+            pointerEvents: 'auto',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow = '0 0 24px 6px rgba(255, 176, 0, 0.5)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = 'none'
+          }}
+        />
       </Html>
     </group>
   )

@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic'
 import { useState, useEffect, useCallback } from 'react'
 import { triggerKeyPress, keyEventToKeyId, lookupKeyPress, updateMousePos } from '@/lib/input-state'
+import { HeldPaper } from '@/components/held-paper'
 
 // Dynamically import the 3D scene to avoid SSR issues with Three.js
 const RetroComputerScene = dynamic(
@@ -31,6 +32,10 @@ export default function Home() {
   const [screenState, setScreenState] = useState<'boot' | 'login' | 'desktop' | 'document'>('boot')
   // Floppy disk state: false = on the desk, true = inserted into the tower
   const [floppyInserted, setFloppyInserted] = useState(false)
+  // Print flow: 'idle' → 'printing' (printer dispenses paper) → 'held' (close-up)
+  const [printState, setPrintState] = useState<'idle' | 'printing' | 'held'>('idle')
+  // Ceiling light bulb: on by default; pull the string to toggle.
+  const [lightOn, setLightOn] = useState(true)
 
   // Auto-power-on after the scene mounts for that "boot up" cinematic feel
   useEffect(() => {
@@ -96,18 +101,6 @@ export default function Home() {
     setScreenState('desktop')
   }, [])
 
-  // CD case click — context-dependent:
-  //   On desktop  → insert the CD → Word document opens
-  //   On document → eject the CD → back to desktop
-  //   On other states → no-op
-  const handleInsertCD = useCallback(() => {
-    setScreenState((s) => {
-      if (s === 'desktop') return 'document'
-      if (s === 'document') return 'desktop'
-      return s
-    })
-  }, [])
-
   const handleCloseDocument = useCallback(() => {
     setScreenState('desktop')
   }, [])
@@ -118,16 +111,43 @@ export default function Home() {
     setFloppyInserted(true)
   }, [])
 
-  // 3D mouse click — primary system navigation:
-  //   On desktop  → click mouse → insert CD → Word document opens
-  //   On document → click mouse → close document → back to desktop
-  //   On other states → no-op
+  // 3D mouse click — navigation. The resume is LOCKED until the floppy disk
+  // has been inserted into the tower; before that, clicking does nothing.
   const handleMouseClick = useCallback(() => {
+    if (!floppyInserted) return
     setScreenState((s) => {
       if (s === 'desktop') return 'document'
       if (s === 'document') return 'desktop'
       return s
     })
+  }, [floppyInserted])
+
+  // Open the resume by clicking the Resume.docx desktop icon (only works once
+  // the floppy disk has been inserted / the resume is "loaded").
+  const handleOpenResume = useCallback(() => {
+    if (!floppyInserted) return
+    setScreenState('document')
+  }, [floppyInserted])
+
+  // Print button clicked in the Word document → run the printer dispense
+  // animation, then show the held-paper close-up.
+  const handlePrint = useCallback(() => {
+    setPrintState('printing')
+  }, [])
+
+  // After the printer has dispensed the sheet, switch to the held-paper view.
+  useEffect(() => {
+    if (printState !== 'printing') return
+    const t = setTimeout(() => setPrintState('held'), 2400)
+    return () => clearTimeout(t)
+  }, [printState])
+
+  const handleCloseHeldPaper = useCallback(() => {
+    setPrintState('idle')
+  }, [])
+
+  const handleToggleLight = useCallback(() => {
+    setLightOn((v) => !v)
   }, [])
 
   return (
@@ -155,7 +175,7 @@ export default function Home() {
           <span
             className={`inline-block h-2 w-2 rounded-full ${powered ? 'bg-amber-400 shadow-[0_0_8px_2px_rgba(251,191,36,0.7)]' : 'bg-amber-900'}`}
           />
-          <span>NEKO V2.4.1</span>
+          <span>TERM-OS V2.4.1</span>
         </div>
         <div className="hidden sm:block">PORTFOLIO_TERMINAL // {new Date().getFullYear()}</div>
         <div className="flex items-center gap-2">
@@ -170,14 +190,21 @@ export default function Home() {
           powered={powered}
           screenState={screenState}
           floppyInserted={floppyInserted}
+          printing={printState === 'printing'}
+          lightOn={lightOn}
           onPowerToggle={handlePowerToggle}
           onLogin={handleLogin}
-          onInsertCD={handleInsertCD}
           onCloseDocument={handleCloseDocument}
           onInsertFloppy={handleInsertFloppy}
           onMouseClick={handleMouseClick}
+          onPrint={handlePrint}
+          onToggleLight={handleToggleLight}
+          onOpenResume={handleOpenResume}
         />
       </div>
+
+      {/* Held-paper close-up overlay — shown after the resume is printed */}
+      {printState === 'held' && <HeldPaper onClose={handleCloseHeldPaper} />}
 
       {/* Footer hint — changes based on current screen state */}
       <footer className="absolute bottom-0 left-0 right-0 z-40 flex flex-col items-center justify-center gap-1 px-4 py-4 text-center font-mono text-[10px] uppercase tracking-[0.25em] text-amber-400/50 sm:text-xs">

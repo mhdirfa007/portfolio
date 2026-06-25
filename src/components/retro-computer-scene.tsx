@@ -5,8 +5,8 @@ import { OrbitControls, RoundedBox, Html, useProgress } from '@react-three/drei'
 import { useEffect, useRef, useState, Suspense } from 'react'
 import * as THREE from 'three'
 import { ComputerScreen, ScreenState } from './computer-screen'
-import { CDCase } from './cd-case'
-import { inputState, mousePosState, type PressState } from '@/lib/input-state'
+import { Hands } from './hands'
+import { inputState, mousePosState, triggerMouseClick, type PressState } from '@/lib/input-state'
 
 /* ----------------------------------------------------------------------------
    CRT Monitor
@@ -21,15 +21,21 @@ import { inputState, mousePosState, type PressState } from '@/lib/input-state'
 function CRTMonitor({
   powered,
   screenState,
+  floppyInserted,
   onPowerToggle,
   onLogin,
   onCloseDocument,
+  onPrint,
+  onOpenResume,
 }: {
   powered: boolean
   screenState: ScreenState
+  floppyInserted: boolean
   onPowerToggle: () => void
   onLogin: () => void
   onCloseDocument: () => void
+  onPrint: () => void
+  onOpenResume: () => void
 }) {
   // Boot-up power-on animation (emissive flash → settle)
   const screenFaceMatRef = useRef<THREE.MeshStandardMaterial>(null)
@@ -97,20 +103,26 @@ function CRTMonitor({
         transform
         occlude={false}
         position={[0, 0.1, 1.74]}
-        distanceFactor={1.55}
+        distanceFactor={1.5}
         wrapperClass="crt-screen-wrapper"
         style={{
           width: '1024px',
           height: '768px',
-          pointerEvents: screenState === 'login' || screenState === 'document' ? 'auto' : 'none',
+          pointerEvents:
+            screenState === 'login' || screenState === 'document' || screenState === 'desktop'
+              ? 'auto'
+              : 'none',
           opacity: powered ? 1 : 0,
           transition: 'opacity 0.3s linear',
         }}
       >
         <ComputerScreen
           state={screenState}
+          floppyInserted={floppyInserted}
           onLogin={onLogin}
           onCloseDocument={onCloseDocument}
+          onPrint={onPrint}
+          onOpenResume={onOpenResume}
         />
       </Html>
 
@@ -237,16 +249,18 @@ function CRTMonitor({
 // Height of the tower — used by both DesktopTower and FloppyDisk to compute
 // the floppy drive slot position in world space.
 const TOWER_HEIGHT = 3.2
-const TOWER_X = 3.0
+const TOWER_X = 3.7
 const TOWER_Y = -2.65 + TOWER_HEIGHT / 2 // desk top + half height
 const TOWER_Z = 0.4
-// Floppy drive slot position (local Y within the tower)
+// Floppy drive slot position (local within the tower group)
 const FLOPPY_DRIVE_LOCAL_Y = 0.55
-// World position of the floppy drive slot (where the floppy flies into)
+const FLOPPY_DRIVE_LOCAL_X = -0.2
+// World position of the floppy drive slot face — must match the slot mesh
+// drawn inside DesktopTower (local x=-0.2, y=0.55, front face z≈1.54).
 const FLOPPY_DRIVE_WORLD: [number, number, number] = [
-  TOWER_X,
+  TOWER_X + FLOPPY_DRIVE_LOCAL_X,
   TOWER_Y + FLOPPY_DRIVE_LOCAL_Y,
-  TOWER_Z + 1.74, // just in front of the front face
+  TOWER_Z + 1.5, // flush at the front face of the drive bay
 ]
 
 function DesktopTower({ floppyInserted }: { floppyInserted: boolean }) {
@@ -273,26 +287,35 @@ function DesktopTower({ floppyInserted }: { floppyInserted: boolean }) {
         <meshStandardMaterial color="#666" />
       </mesh>
 
-      {/* Floppy drive — the slot where the floppy disk gets inserted.
-          When floppyInserted is true, show the disk inside the slot. */}
+      {/* Floppy drive — the slot where the floppy disk gets inserted. */}
       <mesh position={[0, FLOPPY_DRIVE_LOCAL_Y, 1.51]}>
         <boxGeometry args={[1.0, 0.28, 0.04]} />
         <meshStandardMaterial color="#9c9787" roughness={0.5} />
       </mesh>
       {/* Floppy drive slot opening (dark rectangle) */}
-      <mesh position={[-0.2, FLOPPY_DRIVE_LOCAL_Y, 1.53]}>
-        <boxGeometry args={[0.5, 0.04, 0.02]} />
-        <meshStandardMaterial color="#1a1a1a" />
+      <mesh position={[-0.2, FLOPPY_DRIVE_LOCAL_Y, 1.535]}>
+        <boxGeometry args={[0.52, 0.055, 0.02]} />
+        <meshStandardMaterial color="#0a0a0a" roughness={0.5} />
       </mesh>
-      {/* When a floppy is inserted, show the disk face in the slot */}
+      {/* When a floppy is inserted, show the dark disk face flush in the slot */}
       {floppyInserted && (
-        <mesh position={[-0.2, FLOPPY_DRIVE_LOCAL_Y + 0.05, 1.54]}>
-          <boxGeometry args={[0.48, 0.18, 0.01]} />
-          <meshStandardMaterial color="#222244" roughness={0.6} />
+        <mesh position={[-0.2, FLOPPY_DRIVE_LOCAL_Y + 0.04, 1.545]}>
+          <boxGeometry args={[0.50, 0.20, 0.015]} />
+          <meshStandardMaterial color="#222244" roughness={0.55} />
         </mesh>
       )}
-      {/* Floppy eject button */}
-      <mesh position={[0.4, FLOPPY_DRIVE_LOCAL_Y - 0.1, 1.53]}>
+      {/* Drive activity LED — glows amber when disk is inserted */}
+      <mesh position={[0.35, FLOPPY_DRIVE_LOCAL_Y - 0.07, 1.535]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.025, 0.025, 0.02, 14]} />
+        <meshStandardMaterial
+          color={floppyInserted ? '#ffaa00' : '#442200'}
+          emissive={floppyInserted ? '#ffaa00' : '#000'}
+          emissiveIntensity={floppyInserted ? 2.0 : 0}
+          toneMapped={false}
+        />
+      </mesh>
+      {/* Eject button */}
+      <mesh position={[0.4, FLOPPY_DRIVE_LOCAL_Y - 0.1, 1.535]}>
         <boxGeometry args={[0.06, 0.03, 0.02]} />
         <meshStandardMaterial color="#666" />
       </mesh>
@@ -321,6 +344,27 @@ function DesktopTower({ floppyInserted }: { floppyInserted: boolean }) {
         />
       </mesh>
 
+      {/* Front I/O panel — USB port + audio jacks (below the power LEDs) */}
+      <mesh position={[0, -0.42, 1.51]}>
+        <boxGeometry args={[0.5, 0.18, 0.04]} />
+        <meshStandardMaterial color="#7a7565" roughness={0.5} />
+      </mesh>
+      {/* USB port (dark slot) */}
+      <mesh position={[-0.13, -0.42, 1.54]}>
+        <boxGeometry args={[0.16, 0.05, 0.02]} />
+        <meshStandardMaterial color="#15151a" roughness={0.6} />
+      </mesh>
+      {/* Pink mic jack */}
+      <mesh position={[0.05, -0.42, 1.54]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.03, 0.03, 0.03, 16]} />
+        <meshStandardMaterial color="#e86aa0" roughness={0.4} />
+      </mesh>
+      {/* Green audio jack */}
+      <mesh position={[0.16, -0.42, 1.54]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.03, 0.03, 0.03, 16]} />
+        <meshStandardMaterial color="#7bc043" roughness={0.4} />
+      </mesh>
+
       {/* Brand vent slats */}
       {[0, 1, 2, 3, 4].map((i) => (
         <mesh key={i} position={[0, -0.7 - i * 0.18, 1.51]}>
@@ -341,9 +385,12 @@ function DesktopTower({ floppyInserted }: { floppyInserted: boolean }) {
 }
 
 /* ----------------------------------------------------------------------------
-   Floppy disk — sits on the desk next to the tower.
-   When clicked, animates flying into the tower's floppy drive slot.
-   After insertion, the disk stays in the drive (visible in the slot).
+   Floppy disk — sits on the desk next to the keyboard.
+   When clicked, plays a 3-phase animation:
+     Phase 1 (0→0.35): lift off the desk + begin rotating upright
+     Phase 2 (0.35→0.75): arc across toward the tower front face
+     Phase 3 (0.75→1.0): slide straight into the drive slot
+   At t=1 the disk is fully inside; the slot in DesktopTower shows the face.
 ---------------------------------------------------------------------------- */
 
 function FloppyDisk({
@@ -354,36 +401,79 @@ function FloppyDisk({
   onInsert: () => void
 }) {
   const meshRef = useRef<THREE.Group>(null)
-  // The resting position on the desk — to the LEFT of the mouse, in front of
-  // the tower, clearly visible. Mouse is at (2.6, -2.55, 2.6), tower at (3.0, ..., 0.4).
-  // Place floppy at x=1.8 so it's between the keyboard and the mouse.
-  // y=-2.6 puts it just above the desk top (desk top at y=-2.65).
-  const deskPos: [number, number, number] = [1.8, -2.58, 2.8]
-  // The inserted position (inside the floppy drive slot)
-  const insertedPos = FLOPPY_DRIVE_WORLD
+  const progress = useRef(0)
 
-  useFrame(() => {
+  // Resting position: on the desk front-left of the keyboard, clearly visible.
+  const DESK: [number, number, number] = [-2.3, -2.58, 3.3]
+  // Final inserted position: in the slot on the tower front face.
+  // The slot faces +Z, so the disk must be upright (rotated 90° around X).
+  const SLOT = FLOPPY_DRIVE_WORLD
+
+  useFrame((_, delta) => {
     if (!meshRef.current) return
-    const goal = inserted ? insertedPos : deskPos
-    // Lerp toward the goal position for smooth animation
-    meshRef.current.position.x += (goal[0] - meshRef.current.position.x) * 0.12
-    meshRef.current.position.y += (goal[1] - meshRef.current.position.y) * 0.12
-    meshRef.current.position.z += (goal[2] - meshRef.current.position.z) * 0.12
-    // Rotate to face the drive when inserted
-    const targetRotY = inserted ? 0 : 0.3
-    meshRef.current.rotation.y += (targetRotY - meshRef.current.rotation.y) * 0.12
+
+    const target = inserted ? 1 : 0
+    // Smooth approach: fast when far, slow as it settles into the slot.
+    const speed = progress.current < 0.7 ? 0.018 : 0.032
+    progress.current += (target - progress.current) * (speed + delta * 0.4)
+    progress.current = Math.max(0, Math.min(1, progress.current))
+    const p = progress.current
+
+    // ---- Position ----
+    // Phase 1 (0→0.35): lift up from desk + move slightly toward tower.
+    // Phase 2 (0.35→0.75): arc to just in front of the drive slot.
+    // Phase 3 (0.75→1.0): slide straight forward (–Z) into the slot.
+    let x: number, y: number, z: number
+
+    if (p <= 0.35) {
+      const t = p / 0.35
+      x = DESK[0] + (SLOT[0] - DESK[0]) * t * 0.2
+      y = DESK[1] + t * 1.6           // lift up
+      z = DESK[2] + (SLOT[2] - DESK[2]) * t * 0.2
+    } else if (p <= 0.75) {
+      const t = (p - 0.35) / 0.40
+      const ease = t * t * (3 - 2 * t) // smooth-step
+      x = DESK[0] + (SLOT[0] - DESK[0]) * (0.2 + ease * 0.8)
+      y = (DESK[1] + 1.6) + (SLOT[1] - DESK[1] - 1.6) * ease
+      z = DESK[2] + (SLOT[2] - DESK[2]) * (0.2 + ease * 0.8)
+    } else {
+      const t = (p - 0.75) / 0.25
+      const ease = t * t * (3 - 2 * t)
+      x = SLOT[0]
+      y = SLOT[1]
+      z = SLOT[2] + (1 - ease) * 0.55  // slide from 0.55 ahead into the slot
+    }
+
+    meshRef.current.position.set(x, y, z)
+
+    // ---- Rotation ----
+    // Resting: flat on desk (rotX=0). Inserted: upright to face the slot (rotX = -π/2).
+    // Also spin slightly (rotY) while flying for a coin-toss feel.
+    const targetRotX = inserted ? -Math.PI / 2 : 0
+    const targetRotY = inserted ? 0 : 0.25
+    const spinY = p < 0.75 ? Math.sin(p * Math.PI * 1.5) * 0.6 : 0
+    meshRef.current.rotation.x += (targetRotX - meshRef.current.rotation.x) * 0.14
+    meshRef.current.rotation.y += (targetRotY + spinY - meshRef.current.rotation.y) * 0.14
+
+    // ---- Scale ---- shrink to fit the narrow drive slot as it inserts.
+    const targetScale = p > 0.75 ? 1 - ((p - 0.75) / 0.25) * 0.5 : 1
+    const s = meshRef.current.scale.x + (targetScale - meshRef.current.scale.x) * 0.2
+    meshRef.current.scale.set(s, s, s)
+
+    // Once fully seated, hide the flying disk — the drive's inserted-face mesh
+    // (drawn in DesktopTower) takes over so it reads as "received by the tray".
+    meshRef.current.visible = !(inserted && p > 0.97)
   })
 
   return (
-    <group ref={meshRef} position={deskPos}>
-      {/* Floppy disk body — classic 3.5" floppy, lying flat on the desk.
-          Made larger (1.0 × 1.0) so it's clearly visible. */}
+    <group ref={meshRef} position={DESK}>
+      {/* Floppy disk body */}
       <RoundedBox args={[1.0, 0.08, 1.0]} radius={0.03} smoothness={3} castShadow>
         <meshStandardMaterial color="#1a1a3a" roughness={0.6} metalness={0.1} />
       </RoundedBox>
 
       {/* Top label area */}
-      <mesh position={[0, 0.05, 0]}>
+      <mesh position={[0, 0.045, 0]}>
         <boxGeometry args={[0.85, 0.01, 0.6]} />
         <meshStandardMaterial color="#f0f0e0" roughness={0.8} />
       </mesh>
@@ -407,14 +497,13 @@ function FloppyDisk({
         </div>
       </Html>
 
-      {/* Metal shutter (the sliding metal piece at the top) */}
-      <mesh position={[0, 0.05, -0.3]}>
+      {/* Metal shutter */}
+      <mesh position={[0, 0.045, -0.3]}>
         <boxGeometry args={[0.6, 0.02, 0.25]} />
         <meshStandardMaterial color="#aaa" roughness={0.3} metalness={0.8} />
       </mesh>
 
-      {/* Click button — covers the floppy, captures clicks.
-          Only active when NOT inserted. */}
+      {/* Click button — visible only when not yet inserted */}
       {!inserted && (
         <Html position={[0, 0.06, 0]} center distanceFactor={2.5}>
           <button
@@ -424,11 +513,11 @@ function FloppyDisk({
               onInsert()
             }}
             onPointerDown={(e) => e.stopPropagation()}
-            aria-label="Insert floppy disk"
+            aria-label="Insert floppy disk into CPU"
             title="Click to insert the floppy disk"
             style={{
-              width: '100px',
-              height: '100px',
+              width: '110px',
+              height: '110px',
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
@@ -440,7 +529,7 @@ function FloppyDisk({
               pointerEvents: 'auto',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 0 20px 4px rgba(255, 176, 0, 0.5)'
+              e.currentTarget.style.boxShadow = '0 0 22px 5px rgba(255,176,0,0.55)'
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.boxShadow = 'none'
@@ -453,14 +542,102 @@ function FloppyDisk({
 }
 
 /* ----------------------------------------------------------------------------
+   Digital desk clock — a small LCD clock on the desk showing the live system
+   time (updates every second), styled like a glowing red 7-segment display.
+---------------------------------------------------------------------------- */
+
+function formatClock(): string {
+  const d = new Date()
+  let h = d.getHours()
+  const m = d.getMinutes().toString().padStart(2, '0')
+  const s = d.getSeconds().toString().padStart(2, '0')
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  h = h % 12 || 12
+  return `${h.toString().padStart(2, '0')}:${m}:${s} ${ampm}`
+}
+
+function DigitalClock() {
+  const [time, setTime] = useState('12:00:00 AM')
+
+  useEffect(() => {
+    setTime(formatClock())
+    const id = setInterval(() => setTime(formatClock()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  return (
+    <group position={[-3.25, -2.4, 2.9]} rotation={[-0.12, 0.3, 0]}>
+      {/* Clock body */}
+      <RoundedBox args={[1.1, 0.55, 0.4]} radius={0.05} smoothness={4} castShadow receiveShadow>
+        <meshStandardMaterial color="#101014" roughness={0.6} metalness={0.2} />
+      </RoundedBox>
+      {/* Recessed display panel */}
+      <mesh position={[0, 0.03, 0.205]}>
+        <planeGeometry args={[0.92, 0.34]} />
+        <meshStandardMaterial
+          color="#220404"
+          emissive="#330000"
+          emissiveIntensity={0.6}
+          roughness={0.3}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {/* Live time readout */}
+      <Html transform position={[0, 0.03, 0.215]} distanceFactor={1.5} pointerEvents="none">
+        <div
+          style={{
+            width: '270px',
+            textAlign: 'center',
+            fontFamily: '"Courier New", monospace',
+            fontWeight: 700,
+            fontSize: '46px',
+            letterSpacing: '2px',
+            color: '#ff3b30',
+            textShadow: '0 0 6px rgba(255,59,48,0.9), 0 0 14px rgba(255,59,48,0.5)',
+            userSelect: 'none',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {time}
+        </div>
+      </Html>
+
+      {/* Little feet */}
+      <mesh position={[-0.35, -0.3, 0.08]} castShadow>
+        <boxGeometry args={[0.12, 0.08, 0.12]} />
+        <meshStandardMaterial color="#0a0a0c" roughness={0.7} />
+      </mesh>
+      <mesh position={[0.35, -0.3, 0.08]} castShadow>
+        <boxGeometry args={[0.12, 0.08, 0.12]} />
+        <meshStandardMaterial color="#0a0a0c" roughness={0.7} />
+      </mesh>
+
+      {/* Brand dot / alarm LED */}
+      <mesh position={[0.42, -0.12, 0.205]}>
+        <circleGeometry args={[0.02, 12]} />
+        <meshStandardMaterial color="#33ff66" emissive="#33ff66" emissiveIntensity={1.5} toneMapped={false} />
+      </mesh>
+    </group>
+  )
+}
+
+/* ----------------------------------------------------------------------------
    Desk surface
 ---------------------------------------------------------------------------- */
 
 function DeskSurface() {
+  // Four legs at the visible corners so the desk reads as grounded, not floating.
+  const legPositions: [number, number, number][] = [
+    [-5.5, -4.6, 4.2],
+    [5.5, -4.6, 4.2],
+    [-5.5, -4.6, -3.2],
+    [5.5, -4.6, -3.2],
+  ]
   return (
     <group>
       {/* Desk top — raised so it's visible alongside the monitor stand */}
-      <mesh position={[0, -2.85, 0]} receiveShadow>
+      <mesh position={[0, -2.85, 0]} receiveShadow castShadow>
         <boxGeometry args={[20, 0.4, 12]} />
         <meshStandardMaterial color="#2a1f15" roughness={0.85} metalness={0.05} />
       </mesh>
@@ -473,6 +650,19 @@ function DeskSurface() {
           opacity={0.18}
           blending={THREE.AdditiveBlending}
         />
+      </mesh>
+
+      {/* ---- Desk legs (so the table isn't floating) ---- */}
+      {legPositions.map((p, i) => (
+        <mesh key={i} position={p} castShadow receiveShadow>
+          <boxGeometry args={[0.55, 3.4, 0.55]} />
+          <meshStandardMaterial color="#241a10" roughness={0.9} metalness={0.03} />
+        </mesh>
+      ))}
+      {/* Floor to ground the legs visually + catch a soft shadow */}
+      <mesh position={[0, -6.35, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[40, 30]} />
+        <meshStandardMaterial color="#120d08" roughness={1} metalness={0} />
       </mesh>
     </group>
   )
@@ -688,6 +878,7 @@ function RetroMouse({ onMouseClick }: { onMouseClick: () => void }) {
 
   const handleClick = () => {
     setClickAnim(1) // trigger the press-down animation
+    triggerMouseClick() // pulse the shared signal so the cartoon hand presses
     onMouseClick()
   }
 
@@ -704,6 +895,27 @@ function RetroMouse({ onMouseClick }: { onMouseClick: () => void }) {
           <meshBasicMaterial color="#332211" side={THREE.DoubleSide} />
         </mesh>
       </group>
+
+      {/* ---- Mouse cord: a curved wire running from the mouse back to the
+          tower (so it reads as a wired mouse). Static tube on the desk. ---- */}
+      <mesh castShadow>
+        <tubeGeometry
+          args={[
+            new THREE.CatmullRomCurve3([
+              new THREE.Vector3(padX - 0.1, padY + 0.12, padZ - 0.35),
+              new THREE.Vector3(padX + 0.35, padY + 0.04, padZ - 0.9),
+              new THREE.Vector3(padX + 0.7, padY + 0.02, padZ - 1.6),
+              new THREE.Vector3(TOWER_X - 0.55, padY + 0.05, TOWER_Z + 1.7),
+              new THREE.Vector3(TOWER_X - 0.3, padY + 0.25, TOWER_Z + 1.5),
+            ]),
+            40,
+            0.035,
+            8,
+            false,
+          ]}
+        />
+        <meshStandardMaterial color="#3a3a3a" roughness={0.7} />
+      </mesh>
 
       {/* ---- Mouse body (MOVES with cursor + presses down on click) ---- */}
       <group ref={mouseGroupRef} position={[padX, padY, padZ]} rotation={[0, -0.2, 0]}>
@@ -787,17 +999,234 @@ function RetroMouse({ onMouseClick }: { onMouseClick: () => void }) {
 
 
 /* ----------------------------------------------------------------------------
+   Inkjet printer — sits on the desk to the left, mirroring the tower.
+   When `printing` is true, a sheet of paper rises out of the top output slot
+   and tilts forward (the resume being dispensed).
+---------------------------------------------------------------------------- */
+
+function Printer({ printing }: { printing: boolean }) {
+  const paperRef = useRef<THREE.Group>(null)
+  const progress = useRef(0)
+
+  useFrame(() => {
+    if (!paperRef.current) return
+    const goal = printing ? 1 : 0
+    progress.current += (goal - progress.current) * 0.06
+    const p = progress.current
+    // Paper rises from inside the printer (y 0 → 1.1) and eases forward (z).
+    paperRef.current.position.y = 0.35 + p * 1.25
+    paperRef.current.position.z = 0.2 + p * 0.35
+    paperRef.current.rotation.x = -0.15 - p * 0.25
+    // Scale the visible sheet up a touch as it emerges
+    const s = 0.6 + p * 0.4
+    paperRef.current.scale.set(1, s, 1)
+  })
+
+  return (
+    <group position={[-3.7, -2.65, 0.7]}>
+      {/* Printer base body */}
+      <RoundedBox args={[2.2, 0.9, 1.9]} radius={0.1} smoothness={4} position={[0, 0.45, 0]} castShadow receiveShadow>
+        <meshStandardMaterial color="#d8d2c2" roughness={0.7} metalness={0.05} />
+      </RoundedBox>
+      {/* Sloped top with the paper output slot */}
+      <mesh position={[0, 0.92, -0.1]} rotation={[-0.25, 0, 0]} castShadow>
+        <boxGeometry args={[2.0, 0.1, 1.2]} />
+        <meshStandardMaterial color="#cfc9b8" roughness={0.7} />
+      </mesh>
+      {/* Output slot (dark) */}
+      <mesh position={[0, 0.98, 0.45]}>
+        <boxGeometry args={[1.7, 0.04, 0.12]} />
+        <meshStandardMaterial color="#15151a" roughness={0.6} />
+      </mesh>
+      {/* Control panel + power LED */}
+      <mesh position={[0.7, 0.46, 0.96]}>
+        <boxGeometry args={[0.5, 0.18, 0.02]} />
+        <meshStandardMaterial color="#7a7565" roughness={0.5} />
+      </mesh>
+      <mesh position={[0.6, 0.46, 0.98]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.035, 0.035, 0.02, 16]} />
+        <meshStandardMaterial
+          color={printing ? '#33ff66' : '#1f7a3a'}
+          emissive={printing ? '#33ff66' : '#0a2a14'}
+          emissiveIntensity={printing ? 2.2 : 0.3}
+          toneMapped={false}
+        />
+      </mesh>
+      {/* Front paper tray lip */}
+      <mesh position={[0, 0.12, 1.0]} rotation={[0.5, 0, 0]}>
+        <boxGeometry args={[1.8, 0.06, 0.5]} />
+        <meshStandardMaterial color="#c8c2b2" roughness={0.7} />
+      </mesh>
+
+      {/* ---- The dispensing paper sheet ---- */}
+      <group ref={paperRef} position={[0, 0.35, 0.2]}>
+        <mesh position={[0, 0.6, 0]} castShadow>
+          <planeGeometry args={[1.5, 1.9]} />
+          <meshStandardMaterial color="#fdfdfa" roughness={0.85} side={THREE.DoubleSide} />
+        </mesh>
+        {/* Faint printed lines hint */}
+        {printing &&
+          [0, 1, 2, 3, 4].map((i) => (
+            <mesh key={i} position={[0, 1.1 - i * 0.22, 0.001]}>
+              <planeGeometry args={[1.1, 0.025]} />
+              <meshBasicMaterial color="#b8b8c0" />
+            </mesh>
+          ))}
+      </group>
+    </group>
+  )
+}
+
+/* ----------------------------------------------------------------------------
+   Hanging ceiling light — a bulb on a cord above the desk with a pull string.
+   Click the string (or bulb) to toggle the light on/off. When on, the bulb
+   glows and a warm point light illuminates the whole scene.
+---------------------------------------------------------------------------- */
+
+function HangingLight({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  const stringRef = useRef<THREE.Group>(null)
+  const tug = useRef(0)
+  const filamentRef = useRef<THREE.MeshStandardMaterial>(null)
+  const glassRef = useRef<THREE.MeshStandardMaterial>(null)
+
+  const handlePull = () => {
+    tug.current = 1 // trigger the pull animation
+    onToggle()
+  }
+
+  useFrame((_, delta) => {
+    // Decay the tug + animate the pull string downward then back.
+    tug.current = Math.max(0, tug.current - delta * 3)
+    if (stringRef.current) {
+      const pull = Math.sin(tug.current * Math.PI) * 0.18
+      stringRef.current.position.y = -0.55 - pull
+      stringRef.current.scale.y = 1 + pull * 1.6
+    }
+    // Bulb glow lerp
+    if (filamentRef.current) {
+      const target = on ? 3.5 : 0.0
+      filamentRef.current.emissiveIntensity += (target - filamentRef.current.emissiveIntensity) * 0.2
+    }
+    if (glassRef.current) {
+      const target = on ? 1.4 : 0.0
+      glassRef.current.emissiveIntensity += (target - glassRef.current.emissiveIntensity) * 0.2
+    }
+  })
+
+  // Bulb hangs above and slightly in front of the monitor.
+  const BULB: [number, number, number] = [-0.4, 3.7, 1.2]
+
+  return (
+    <group position={BULB}>
+      {/* Cord going up out of frame */}
+      <mesh position={[0, 1.6, 0]}>
+        <cylinderGeometry args={[0.02, 0.02, 3.2, 8]} />
+        <meshStandardMaterial color="#222" roughness={0.8} />
+      </mesh>
+
+      {/* Lamp socket / fixture */}
+      <mesh position={[0, 0.18, 0]} castShadow>
+        <cylinderGeometry args={[0.12, 0.16, 0.3, 16]} />
+        <meshStandardMaterial color="#3a3a3a" roughness={0.5} metalness={0.6} />
+      </mesh>
+
+      {/* Glass bulb */}
+      <mesh position={[0, -0.05, 0]} castShadow>
+        <sphereGeometry args={[0.26, 24, 24]} />
+        <meshStandardMaterial
+          ref={glassRef}
+          color={on ? '#fff3c0' : '#cfcabd'}
+          emissive="#ffcf66"
+          emissiveIntensity={0}
+          roughness={0.15}
+          metalness={0.1}
+          transparent
+          opacity={0.85}
+          toneMapped={false}
+        />
+      </mesh>
+      {/* Filament core (bright when on) */}
+      <mesh position={[0, -0.05, 0]}>
+        <sphereGeometry args={[0.11, 16, 16]} />
+        <meshStandardMaterial
+          ref={filamentRef}
+          color="#fff0b0"
+          emissive="#ffd060"
+          emissiveIntensity={0}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {/* The warm light it casts (only meaningful when on; intensity tied to glow) */}
+      <pointLight
+        position={[0, -0.2, 0]}
+        color="#ffdf9e"
+        intensity={on ? 65 : 0}
+        distance={22}
+        decay={2}
+        castShadow
+      />
+
+      {/* ---- Pull string hanging below the bulb ---- */}
+      <group ref={stringRef} position={[0.16, -0.55, 0]}>
+        {/* string */}
+        <mesh position={[0, 0, 0]}>
+          <cylinderGeometry args={[0.012, 0.012, 0.7, 6]} />
+          <meshStandardMaterial color="#d8d2b8" roughness={0.9} />
+        </mesh>
+        {/* bead handle at the end */}
+        <mesh position={[0, -0.4, 0]} castShadow>
+          <sphereGeometry args={[0.06, 12, 12]} />
+          <meshStandardMaterial color="#c9a23a" roughness={0.5} metalness={0.3} />
+        </mesh>
+        {/* Clickable overlay on the bead */}
+        <Html position={[0, -0.4, 0]} center distanceFactor={3}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              handlePull()
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            aria-label="Pull the light string"
+            title="Pull to turn the light on/off"
+            style={{
+              width: '46px',
+              height: '70px',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              margin: 0,
+              outline: 'none',
+              borderRadius: '8px',
+              transition: 'box-shadow 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 0 18px 4px rgba(255,207,102,0.5)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = 'none'
+            }}
+          />
+        </Html>
+      </group>
+    </group>
+  )
+}
+
+/* ----------------------------------------------------------------------------
    Lighting
 ---------------------------------------------------------------------------- */
 
-function Lighting() {
+function Lighting({ lightOn }: { lightOn: boolean }) {
   return (
     <>
-      <ambientLight intensity={0.35} color="#fff6e0" />
+      <ambientLight intensity={lightOn ? 0.35 : 0.12} color="#fff6e0" />
       {/* Warm key light from above-front */}
       <directionalLight
         position={[5, 8, 6]}
-        intensity={1.2}
+        intensity={lightOn ? 1.2 : 0.45}
         color="#fff1d0"
         castShadow
         shadow-mapSize-width={2048}
@@ -810,7 +1239,7 @@ function Lighting() {
         shadow-camera-bottom={-10}
       />
       {/* Cool fill light from the side */}
-      <pointLight position={[-6, 2, -4]} intensity={30} color="#5577ff" distance={20} decay={2} />
+      <pointLight position={[-6, 2, -4]} intensity={lightOn ? 30 : 14} color="#5577ff" distance={20} decay={2} />
       {/* Amber rim light from behind, gives the CRT that glow */}
       <pointLight position={[0, 1, -5]} intensity={15} color="#ff9b00" distance={12} decay={2} />
     </>
@@ -838,22 +1267,30 @@ export default function RetroComputerScene({
   powered,
   screenState,
   floppyInserted,
+  printing,
+  lightOn,
   onPowerToggle,
   onLogin,
-  onInsertCD,
   onCloseDocument,
   onInsertFloppy,
   onMouseClick,
+  onPrint,
+  onToggleLight,
+  onOpenResume,
 }: {
   powered: boolean
   screenState: ScreenState
   floppyInserted: boolean
+  printing: boolean
+  lightOn: boolean
   onPowerToggle: () => void
   onLogin: () => void
-  onInsertCD: () => void
   onCloseDocument: () => void
   onInsertFloppy: () => void
   onMouseClick: () => void
+  onPrint: () => void
+  onToggleLight: () => void
+  onOpenResume: () => void
 }) {
   return (
     <Canvas
@@ -868,22 +1305,28 @@ export default function RetroComputerScene({
       style={{ background: 'transparent' }}
     >
       <Suspense fallback={<SceneLoader />}>
-        <Lighting />
+        <Lighting lightOn={lightOn} />
 
         <group position={[0, 0, 0]}>
+          <HangingLight on={lightOn} onToggle={onToggleLight} />
           <CRTMonitor
             powered={powered}
             screenState={screenState}
+            floppyInserted={floppyInserted}
             onPowerToggle={onPowerToggle}
             onLogin={onLogin}
             onCloseDocument={onCloseDocument}
+            onPrint={onPrint}
+            onOpenResume={onOpenResume}
           />
           <DesktopTower floppyInserted={floppyInserted} />
+          <Printer printing={printing} />
           <DeskSurface />
+          <DigitalClock />
           <Keyboard />
           <RetroMouse onMouseClick={onMouseClick} />
-          <CDCase onInsert={onInsertCD} />
           <FloppyDisk inserted={floppyInserted} onInsert={onInsertFloppy} />
+          <Hands />
         </group>
 
         <OrbitControls
