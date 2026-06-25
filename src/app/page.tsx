@@ -29,6 +29,8 @@ export default function Home() {
   const [powered, setPowered] = useState(false)
   // Screen state: only meaningful when powered on
   const [screenState, setScreenState] = useState<'boot' | 'login' | 'desktop' | 'document'>('boot')
+  // Floppy disk state: false = on the desk, true = inserted into the tower
+  const [floppyInserted, setFloppyInserted] = useState(false)
 
   // Auto-power-on after the scene mounts for that "boot up" cinematic feel
   useEffect(() => {
@@ -90,6 +92,12 @@ export default function Home() {
     setScreenState('desktop')
   }, [])
 
+  // Floppy disk click — inserts the floppy into the tower's floppy drive.
+  // The floppy animates flying from the desk into the drive slot.
+  const handleInsertFloppy = useCallback(() => {
+    setFloppyInserted(true)
+  }, [])
+
   return (
     <main className="relative min-h-screen w-full overflow-hidden bg-[#0a0a0a] text-amber-100">
       {/* Background ambient gradient */}
@@ -129,10 +137,12 @@ export default function Home() {
         <RetroComputerScene
           powered={powered}
           screenState={screenState}
+          floppyInserted={floppyInserted}
           onPowerToggle={handlePowerToggle}
           onLogin={handleLogin}
           onInsertCD={handleInsertCD}
           onCloseDocument={handleCloseDocument}
+          onInsertFloppy={handleInsertFloppy}
         />
       </div>
 
@@ -148,7 +158,7 @@ export default function Home() {
               ? screenState === 'login'
                 ? 'TYPE ANY PASSWORD + ENTER'
                 : screenState === 'desktop'
-                ? 'CLICK THE CD CASE TO INSERT IT'
+                ? 'CLICK THE CD CASE OR FLOPPY DISK'
                 : screenState === 'document'
                 ? 'CLICK THE CD CASE TO EJECT'
                 : 'BOOTING...'

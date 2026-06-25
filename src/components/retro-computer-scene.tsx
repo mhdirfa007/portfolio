@@ -229,48 +229,80 @@ function CRTMonitor({
 
 /* ----------------------------------------------------------------------------
    Desktop tower (matching beige boxy computer case)
+   Now properly sits ON the desk surface.
+   Also exposes the floppy drive slot position so the FloppyDisk component
+   can animate into it.
 ---------------------------------------------------------------------------- */
 
-function DesktopTower() {
+// Height of the tower — used by both DesktopTower and FloppyDisk to compute
+// the floppy drive slot position in world space.
+const TOWER_HEIGHT = 3.2
+const TOWER_X = 3.0
+const TOWER_Y = -2.65 + TOWER_HEIGHT / 2 // desk top + half height
+const TOWER_Z = 0.4
+// Floppy drive slot position (local Y within the tower)
+const FLOPPY_DRIVE_LOCAL_Y = 0.55
+// World position of the floppy drive slot (where the floppy flies into)
+const FLOPPY_DRIVE_WORLD: [number, number, number] = [
+  TOWER_X,
+  TOWER_Y + FLOPPY_DRIVE_LOCAL_Y,
+  TOWER_Z + 1.74, // just in front of the front face
+]
+
+function DesktopTower({ floppyInserted }: { floppyInserted: boolean }) {
   return (
-    <group position={[3.4, -2.55, 0.4]}>
+    <group position={[TOWER_X, TOWER_Y, TOWER_Z]}>
       {/* Main case */}
-      <RoundedBox args={[1.8, 4.6, 3.4]} radius={0.08} smoothness={4} castShadow receiveShadow>
+      <RoundedBox args={[1.8, TOWER_HEIGHT, 3.0]} radius={0.08} smoothness={4} castShadow receiveShadow>
         <meshStandardMaterial color="#d4cebc" roughness={0.7} metalness={0.05} />
       </RoundedBox>
 
       {/* CD-ROM drive bay */}
-      <mesh position={[0, 1.6, 1.71]}>
-        <boxGeometry args={[1.5, 0.35, 0.04]} />
+      <mesh position={[0, 1.1, 1.51]}>
+        <boxGeometry args={[1.5, 0.3, 0.04]} />
         <meshStandardMaterial color="#9c9787" roughness={0.5} />
       </mesh>
       {/* CD tray line */}
-      <mesh position={[0, 1.65, 1.73]}>
+      <mesh position={[0, 1.15, 1.53]}>
         <boxGeometry args={[1.4, 0.04, 0.02]} />
         <meshStandardMaterial color="#222" />
       </mesh>
       {/* CD eject button */}
-      <mesh position={[0.65, 1.55, 1.73]}>
+      <mesh position={[0.65, 1.05, 1.53]}>
         <boxGeometry args={[0.08, 0.04, 0.02]} />
         <meshStandardMaterial color="#666" />
       </mesh>
 
-      {/* Floppy drive */}
-      <mesh position={[0, 1.1, 1.71]}>
-        <boxGeometry args={[1.0, 0.3, 0.04]} />
+      {/* Floppy drive — the slot where the floppy disk gets inserted.
+          When floppyInserted is true, show the disk inside the slot. */}
+      <mesh position={[0, FLOPPY_DRIVE_LOCAL_Y, 1.51]}>
+        <boxGeometry args={[1.0, 0.28, 0.04]} />
         <meshStandardMaterial color="#9c9787" roughness={0.5} />
       </mesh>
-      <mesh position={[-0.2, 1.1, 1.73]}>
+      {/* Floppy drive slot opening (dark rectangle) */}
+      <mesh position={[-0.2, FLOPPY_DRIVE_LOCAL_Y, 1.53]}>
         <boxGeometry args={[0.5, 0.04, 0.02]} />
         <meshStandardMaterial color="#1a1a1a" />
       </mesh>
+      {/* When a floppy is inserted, show the disk face in the slot */}
+      {floppyInserted && (
+        <mesh position={[-0.2, FLOPPY_DRIVE_LOCAL_Y + 0.05, 1.54]}>
+          <boxGeometry args={[0.48, 0.18, 0.01]} />
+          <meshStandardMaterial color="#222244" roughness={0.6} />
+        </mesh>
+      )}
+      {/* Floppy eject button */}
+      <mesh position={[0.4, FLOPPY_DRIVE_LOCAL_Y - 0.1, 1.53]}>
+        <boxGeometry args={[0.06, 0.03, 0.02]} />
+        <meshStandardMaterial color="#666" />
+      </mesh>
 
       {/* Power button area */}
-      <mesh position={[0, 0.5, 1.71]}>
+      <mesh position={[0, -0.1, 1.51]}>
         <boxGeometry args={[0.5, 0.3, 0.04]} />
         <meshStandardMaterial color="#7a7565" roughness={0.5} />
       </mesh>
-      <mesh position={[-0.15, 0.5, 1.74]} rotation={[Math.PI / 2, 0, 0]}>
+      <mesh position={[-0.15, -0.1, 1.54]} rotation={[Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[0.05, 0.05, 0.03, 20]} />
         <meshStandardMaterial
           color="#33ff66"
@@ -279,7 +311,7 @@ function DesktopTower() {
           toneMapped={false}
         />
       </mesh>
-      <mesh position={[0.15, 0.5, 1.74]} rotation={[Math.PI / 2, 0, 0]}>
+      <mesh position={[0.15, -0.1, 1.54]} rotation={[Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[0.05, 0.05, 0.03, 20]} />
         <meshStandardMaterial
           color="#ffaa33"
@@ -290,20 +322,132 @@ function DesktopTower() {
       </mesh>
 
       {/* Brand vent slats */}
-      {[0, 1, 2, 3, 4, 5].map((i) => (
-        <mesh key={i} position={[0, -0.5 - i * 0.18, 1.71]}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <mesh key={i} position={[0, -0.7 - i * 0.18, 1.51]}>
           <boxGeometry args={[1.4, 0.04, 0.02]} />
           <meshStandardMaterial color="#9c9787" />
         </mesh>
       ))}
 
       {/* Side ventilation */}
-      {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
-        <mesh key={i} position={[0.91, 1.5 - i * 0.3, 0]}>
-          <boxGeometry args={[0.02, 0.2, 2.4]} />
+      {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+        <mesh key={i} position={[0.91, 1.0 - i * 0.3, 0]}>
+          <boxGeometry args={[0.02, 0.2, 2.2]} />
           <meshStandardMaterial color="#b8b2a2" />
         </mesh>
       ))}
+    </group>
+  )
+}
+
+/* ----------------------------------------------------------------------------
+   Floppy disk — sits on the desk next to the tower.
+   When clicked, animates flying into the tower's floppy drive slot.
+   After insertion, the disk stays in the drive (visible in the slot).
+---------------------------------------------------------------------------- */
+
+function FloppyDisk({
+  inserted,
+  onInsert,
+}: {
+  inserted: boolean
+  onInsert: () => void
+}) {
+  const meshRef = useRef<THREE.Group>(null)
+  // The resting position on the desk — to the LEFT of the mouse, in front of
+  // the tower, clearly visible. Mouse is at (2.6, -2.55, 2.6), tower at (3.0, ..., 0.4).
+  // Place floppy at x=1.8 so it's between the keyboard and the mouse.
+  // y=-2.6 puts it just above the desk top (desk top at y=-2.65).
+  const deskPos: [number, number, number] = [1.8, -2.58, 2.8]
+  // The inserted position (inside the floppy drive slot)
+  const insertedPos = FLOPPY_DRIVE_WORLD
+
+  useFrame(() => {
+    if (!meshRef.current) return
+    const goal = inserted ? insertedPos : deskPos
+    // Lerp toward the goal position for smooth animation
+    meshRef.current.position.x += (goal[0] - meshRef.current.position.x) * 0.12
+    meshRef.current.position.y += (goal[1] - meshRef.current.position.y) * 0.12
+    meshRef.current.position.z += (goal[2] - meshRef.current.position.z) * 0.12
+    // Rotate to face the drive when inserted
+    const targetRotY = inserted ? 0 : 0.3
+    meshRef.current.rotation.y += (targetRotY - meshRef.current.rotation.y) * 0.12
+  })
+
+  return (
+    <group ref={meshRef} position={deskPos}>
+      {/* Floppy disk body — classic 3.5" floppy, lying flat on the desk.
+          Made larger (1.0 × 1.0) so it's clearly visible. */}
+      <RoundedBox args={[1.0, 0.08, 1.0]} radius={0.03} smoothness={3} castShadow>
+        <meshStandardMaterial color="#1a1a3a" roughness={0.6} metalness={0.1} />
+      </RoundedBox>
+
+      {/* Top label area */}
+      <mesh position={[0, 0.05, 0]}>
+        <boxGeometry args={[0.85, 0.01, 0.6]} />
+        <meshStandardMaterial color="#f0f0e0" roughness={0.8} />
+      </mesh>
+
+      {/* Label text */}
+      <Html position={[0, 0.06, 0]} center distanceFactor={2.5} pointerEvents="none">
+        <div
+          style={{
+            width: '100px',
+            textAlign: 'center',
+            color: '#1a1a3a',
+            fontFamily: '"Courier New", monospace',
+            fontSize: '10px',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            lineHeight: '1.3',
+          }}
+        >
+          <div style={{ fontWeight: 'bold', fontSize: '12px' }}>💾 RESUME</div>
+          <div style={{ fontSize: '8px', opacity: 0.7 }}>MOHAMED IRFAN</div>
+        </div>
+      </Html>
+
+      {/* Metal shutter (the sliding metal piece at the top) */}
+      <mesh position={[0, 0.05, -0.3]}>
+        <boxGeometry args={[0.6, 0.02, 0.25]} />
+        <meshStandardMaterial color="#aaa" roughness={0.3} metalness={0.8} />
+      </mesh>
+
+      {/* Click button — covers the floppy, captures clicks.
+          Only active when NOT inserted. */}
+      {!inserted && (
+        <Html position={[0, 0.06, 0]} center distanceFactor={2.5}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              onInsert()
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            aria-label="Insert floppy disk"
+            title="Click to insert the floppy disk"
+            style={{
+              width: '100px',
+              height: '100px',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              margin: 0,
+              outline: 'none',
+              borderRadius: '6px',
+              transition: 'box-shadow 0.2s',
+              pointerEvents: 'auto',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 0 20px 4px rgba(255, 176, 0, 0.5)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = 'none'
+            }}
+          />
+        </Html>
+      )}
     </group>
   )
 }
@@ -591,17 +735,21 @@ function SceneLoader() {
 export default function RetroComputerScene({
   powered,
   screenState,
+  floppyInserted,
   onPowerToggle,
   onLogin,
   onInsertCD,
   onCloseDocument,
+  onInsertFloppy,
 }: {
   powered: boolean
   screenState: ScreenState
+  floppyInserted: boolean
   onPowerToggle: () => void
   onLogin: () => void
   onInsertCD: () => void
   onCloseDocument: () => void
+  onInsertFloppy: () => void
 }) {
   return (
     <Canvas
@@ -626,11 +774,12 @@ export default function RetroComputerScene({
             onLogin={onLogin}
             onCloseDocument={onCloseDocument}
           />
-          <DesktopTower />
+          <DesktopTower floppyInserted={floppyInserted} />
           <DeskSurface />
           <Keyboard />
           <RetroMouse />
           <CDCase onInsert={onInsertCD} />
+          <FloppyDisk inserted={floppyInserted} onInsert={onInsertFloppy} />
         </group>
 
         <OrbitControls
