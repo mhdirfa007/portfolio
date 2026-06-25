@@ -72,15 +72,16 @@ function CRTMonitor({ powered, onPowerToggle }: { powered: boolean; onPowerToggl
       </mesh>
 
       {/* ---------- Live resume content rendered as DOM in 3D space ---------- */}
-      {/* We use drei <Html transform> to render the resume DOM natively. It's
-          positioned just in front of the screen surface, scaled to fit, and
-          hidden when the monitor is "off". pointerEvents: none so it doesn't
-          interfere with OrbitControls when user drags over the screen. */}
+      {/* drei <Html transform> renders the resume DOM natively in 3D space.
+          `distanceFactor` controls how big the HTML appears in world units:
+          smaller = bigger on screen, larger = smaller. Tuned so the 1024×768
+          resume fits exactly inside the 3.4×2.6 dark CRT screen frame.
+          Position is in front of the screen surface (z=1.74, screen at z=1.725). */}
       <Html
         transform
         occlude={false}
         position={[0, 0.1, 1.74]}
-        distanceFactor={1.4}
+        distanceFactor={1.55}
         wrapperClass="crt-screen-wrapper"
         style={{
           width: '1024px',
@@ -113,29 +114,75 @@ function CRTMonitor({ powered, onPowerToggle }: { powered: boolean; onPowerToggl
         <meshStandardMaterial color="#666" roughness={0.6} />
       </mesh>
 
-      {/* Power button (bottom-right) */}
-      <group
-        position={[1.55, -1.45, 1.72]}
-        onClick={(e) => {
-          e.stopPropagation()
-          onPowerToggle()
-        }}
-        onPointerOver={() => (document.body.style.cursor = 'pointer')}
-        onPointerOut={() => (document.body.style.cursor = 'auto')}
-      >
-        <mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.09, 0.09, 0.06, 24]} />
-          <meshStandardMaterial color="#888" roughness={0.4} metalness={0.5} />
+      {/* Power button (bottom-right) — clickable to toggle the monitor on/off.
+          Visual: 3D meshes. Click handling: a 2D HTML <button> overlay
+          positioned over the 3D button (more reliable than 3D raycast clicks
+          across browsers, especially when OrbitControls is active). */}
+      <group position={[1.55, -1.45, 1.78]}>
+        {/* Power button housing (recessed ring around the button) */}
+        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, -0.04]}>
+          <cylinderGeometry args={[0.13, 0.13, 0.04, 24]} />
+          <meshStandardMaterial color="#2a2a2a" roughness={0.5} metalness={0.3} />
         </mesh>
-        <mesh position={[0, 0.04, 0]}>
-          <cylinderGeometry args={[0.05, 0.05, 0.02, 24]} />
-          <meshStandardMaterial
-            color={powered ? '#33ff66' : '#332222'}
-            emissive={powered ? '#33ff66' : '#000000'}
-            emissiveIntensity={powered ? 2 : 0}
+        {/* Button body (the part you press) */}
+        <mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.1, 0.1, 0.06, 24]} />
+          <meshStandardMaterial color="#999" roughness={0.35} metalness={0.6} />
+        </mesh>
+        {/* Glowing LED ring around the button — shows power state */}
+        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0.04, 0]}>
+          <ringGeometry args={[0.085, 0.1, 24]} />
+          <meshBasicMaterial
+            color={powered ? '#33ff66' : '#330000'}
+            transparent
+            opacity={powered ? 0.95 : 0.3}
+            side={THREE.DoubleSide}
             toneMapped={false}
           />
         </mesh>
+        {/* Inner power LED dot */}
+        <mesh position={[0, 0.05, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.05, 0.05, 0.02, 24]} />
+          <meshStandardMaterial
+            color={powered ? '#33ff66' : '#441111'}
+            emissive={powered ? '#33ff66' : '#220000'}
+            emissiveIntensity={powered ? 2.5 : 0.1}
+            toneMapped={false}
+          />
+        </mesh>
+        {/* 2D HTML overlay button — positioned at the 3D button location and
+            scales with the scene. pointerEvents: auto so it's actually
+            clickable. Stops propagation so OrbitControls doesn't also rotate. */}
+        <Html position={[0, 0.04, 0.06]} center distanceFactor={2.5}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              onPowerToggle()
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            aria-label={powered ? 'Turn monitor off' : 'Turn monitor on'}
+            style={{
+              width: '60px',
+              height: '60px',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              margin: 0,
+              outline: 'none',
+              // Visual hint on hover: subtle ring
+              borderRadius: '50%',
+              transition: 'box-shadow 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 0 20px 4px rgba(51, 255, 102, 0.4)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = 'none'
+            }}
+          />
+        </Html>
       </group>
 
       {/* Monitor adjustment knobs (bottom-left) */}

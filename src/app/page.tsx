@@ -78,12 +78,7 @@ export default function Home() {
           <span className="hidden sm:inline opacity-40">·</span>
           <span>SCROLL TO ZOOM</span>
           <span className="hidden sm:inline opacity-40">·</span>
-          <button
-            onClick={() => setPowered((p) => !p)}
-            className="rounded border border-amber-700/40 px-2 py-0.5 text-amber-300/70 transition hover:border-amber-500/60 hover:text-amber-200"
-          >
-            {powered ? 'POWER OFF' : 'POWER ON'}
-          </button>
+          <span>CLICK THE POWER BUTTON ON THE MONITOR</span>
         </div>
       </footer>
     </main>
