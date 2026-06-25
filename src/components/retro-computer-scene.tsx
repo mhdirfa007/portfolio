@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, Suspense } from 'react'
 import * as THREE from 'three'
 import { ComputerScreen, ScreenState } from './computer-screen'
 import { CDCase } from './cd-case'
-import { inputState, type PressState } from '@/lib/input-state'
+import { inputState, mousePosState, type PressState } from '@/lib/input-state'
 
 /* ----------------------------------------------------------------------------
    CRT Monitor
@@ -623,63 +623,165 @@ function Key({
 }
 
 /* ----------------------------------------------------------------------------
-   Retro ball mouse + mousepad — decoration only (not clickable).
-   The CD case on the desk is the interactive element for inserting/removing
-   the CD, per user request.
+   Retro ball mouse + mousepad — CLICKABLE for system navigation.
+   The 3D mouse FOLLOWS the user's real cursor movement (within the bounds of
+   the mousepad) and has a click animation (presses down when clicked).
+   Clicking the 3D mouse is the primary navigation tool for the system:
+     - On desktop  → click to insert CD → Word document opens
+     - On document → click to close → back to desktop
+     - On other states → no-op
 ---------------------------------------------------------------------------- */
 
-function RetroMouse() {
+function RetroMouse({ onMouseClick }: { onMouseClick: () => void }) {
+  // Mousepad center (static — does NOT move with cursor)
+  const padX = 2.6
+  const padY = -2.55
+  const padZ = 2.6
+  // Mousepad bounds — the mouse body can move within this radius on the pad
+  const padRadius = 0.55
+  // Click animation state
+  const [clickAnim, setClickAnim] = useState(0)
+  // Refs: mouseGroupRef = the moving mouse (follows cursor), mouseBodyRef = inner press-down group
+  const mouseGroupRef = useRef<THREE.Group>(null)
+  const mouseBodyRef = useRef<THREE.Group>(null)
+
+  useFrame(() => {
+    if (!mouseGroupRef.current) return
+    // Read the shared cursor state and translate it to a position on the mousepad.
+    // The cursor is normalized to -1..1 in both axes (set up in page.tsx).
+    const cursor = mousePosState.current
+    if (cursor.active) {
+      // Map cursor x (-1..1) → mousepad x offset
+      const targetX = padX + cursor.x * padRadius
+      // Map cursor y (-1..1) → mousepad z offset
+      // (cursor y is flipped in page.tsx: +y = up = -z on the pad)
+      const targetZ = padZ - cursor.y * padRadius * 0.75
+      // Smooth lerp toward the target position
+      mouseGroupRef.current.position.x += (targetX - mouseGroupRef.current.position.x) * 0.18
+      mouseGroupRef.current.position.z += (targetZ - mouseGroupRef.current.position.z) * 0.18
+      // Slight tilt based on movement direction (gives a "swipe" feel)
+      const dx = mouseGroupRef.current.position.x - padX
+      const dz = mouseGroupRef.current.position.z - padZ
+      mouseGroupRef.current.rotation.z = -dx * 0.25
+      mouseGroupRef.current.rotation.x = dz * 0.25
+    } else {
+      // Cursor inactive — return to center
+      mouseGroupRef.current.position.x += (padX - mouseGroupRef.current.position.x) * 0.1
+      mouseGroupRef.current.position.z += (padZ - mouseGroupRef.current.position.z) * 0.1
+      mouseGroupRef.current.rotation.z += (0 - mouseGroupRef.current.rotation.z) * 0.1
+      mouseGroupRef.current.rotation.x += (0 - mouseGroupRef.current.rotation.x) * 0.1
+    }
+
+    // Click animation — press the mouse body down briefly
+    if (mouseBodyRef.current) {
+      const targetY = -clickAnim * 0.05
+      mouseBodyRef.current.position.y += (targetY - mouseBodyRef.current.position.y) * 0.4
+    }
+  })
+
+  // Decay the click animation via a separate effect (avoids setState in useFrame loop)
+  useEffect(() => {
+    if (clickAnim <= 0) return
+    const t = setTimeout(() => setClickAnim((c) => Math.max(0, c - 0.12)), 16)
+    return () => clearTimeout(t)
+  }, [clickAnim])
+
+  const handleClick = () => {
+    setClickAnim(1) // trigger the press-down animation
+    onMouseClick()
+  }
+
   return (
-    <group position={[2.6, -2.55, 2.6]} rotation={[0, -0.2, 0]}>
-      {/* Mousepad */}
-      <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[1.8, 1.5]} />
-        <meshStandardMaterial color="#1a1a1a" roughness={0.95} />
-      </mesh>
-      {/* Mousepad edge */}
-      <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.86, 0.9, 32]} />
-        <meshBasicMaterial color="#332211" side={THREE.DoubleSide} />
-      </mesh>
+    <>
+      {/* ---- Mousepad (STATIC — does not move with cursor) ---- */}
+      <group position={[padX, padY, padZ]}>
+        <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+          <planeGeometry args={[1.8, 1.5]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={0.95} />
+        </mesh>
+        <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.86, 0.9, 32]} />
+          <meshBasicMaterial color="#332211" side={THREE.DoubleSide} />
+        </mesh>
+      </group>
 
-      {/* Mouse body — egg shape (squashed sphere) */}
-      <mesh position={[0, 0.18, 0]} scale={[0.6, 0.85, 1.0]} castShadow>
-        <sphereGeometry args={[0.45, 24, 24]} />
-        <meshStandardMaterial color="#e8e2d2" roughness={0.5} metalness={0.05} />
-      </mesh>
+      {/* ---- Mouse body (MOVES with cursor + presses down on click) ---- */}
+      <group ref={mouseGroupRef} position={[padX, padY, padZ]} rotation={[0, -0.2, 0]}>
+        {/* Inner group for the press-down click animation */}
+        <group ref={mouseBodyRef}>
+          {/* Mouse body — egg shape (squashed sphere) */}
+          <mesh position={[0, 0.18, 0]} scale={[0.6, 0.85, 1.0]} castShadow>
+            <sphereGeometry args={[0.45, 24, 24]} />
+            <meshStandardMaterial color="#e8e2d2" roughness={0.5} metalness={0.05} />
+          </mesh>
 
-      {/* Button split line (groove down the middle) */}
-      <mesh position={[0, 0.42, 0.15]} rotation={[0.3, 0, 0]}>
-        <boxGeometry args={[0.015, 0.01, 0.5]} />
-        <meshStandardMaterial color="#999" />
-      </mesh>
+          {/* Button split line (groove down the middle) */}
+          <mesh position={[0, 0.42, 0.15]} rotation={[0.3, 0, 0]}>
+            <boxGeometry args={[0.015, 0.01, 0.5]} />
+            <meshStandardMaterial color="#999" />
+          </mesh>
 
-      {/* Left button highlight */}
-      <mesh position={[-0.15, 0.42, 0.18]} rotation={[0.3, 0, 0]}>
-        <boxGeometry args={[0.25, 0.005, 0.4]} />
-        <meshStandardMaterial color="#f4eedf" roughness={0.45} />
-      </mesh>
-      <mesh position={[0.15, 0.42, 0.18]} rotation={[0.3, 0, 0]}>
-        <boxGeometry args={[0.25, 0.005, 0.4]} />
-        <meshStandardMaterial color="#f4eedf" roughness={0.45} />
-      </mesh>
+          {/* Left + right button highlights */}
+          <mesh position={[-0.15, 0.42, 0.18]} rotation={[0.3, 0, 0]}>
+            <boxGeometry args={[0.25, 0.005, 0.4]} />
+            <meshStandardMaterial color="#f4eedf" roughness={0.45} />
+          </mesh>
+          <mesh position={[0.15, 0.42, 0.18]} rotation={[0.3, 0, 0]}>
+            <boxGeometry args={[0.25, 0.005, 0.4]} />
+            <meshStandardMaterial color="#f4eedf" roughness={0.45} />
+          </mesh>
 
-      {/* Mouse ball (visible from below front — peek through cutout) */}
-      <mesh position={[0, 0.08, 0.15]}>
-        <sphereGeometry args={[0.1, 16, 16]} />
-        <meshStandardMaterial color="#aa3322" roughness={0.3} metalness={0.1} />
-      </mesh>
+          {/* Mouse ball (visible from below front — peek through cutout) */}
+          <mesh position={[0, 0.08, 0.15]}>
+            <sphereGeometry args={[0.1, 16, 16]} />
+            <meshStandardMaterial color="#aa3322" roughness={0.3} metalness={0.1} />
+          </mesh>
 
-      {/* Cord — going from back of mouse toward tower */}
-      <mesh position={[-0.05, 0.3, -0.4]} rotation={[0.3, 0, 0.2]} castShadow>
-        <cylinderGeometry args={[0.025, 0.025, 0.6, 12]} />
-        <meshStandardMaterial color="#666" roughness={0.7} />
-      </mesh>
-      <mesh position={[-0.3, 0.2, -0.7]} rotation={[1.2, 0, 0.5]} castShadow>
-        <cylinderGeometry args={[0.025, 0.025, 0.5, 12]} />
-        <meshStandardMaterial color="#666" roughness={0.7} />
-      </mesh>
-    </group>
+          {/* Cord — going from back of mouse toward tower */}
+          <mesh position={[-0.05, 0.3, -0.4]} rotation={[0.3, 0, 0.2]} castShadow>
+            <cylinderGeometry args={[0.025, 0.025, 0.6, 12]} />
+            <meshStandardMaterial color="#666" roughness={0.7} />
+          </mesh>
+          <mesh position={[-0.3, 0.2, -0.7]} rotation={[1.2, 0, 0.5]} castShadow>
+            <cylinderGeometry args={[0.025, 0.025, 0.5, 12]} />
+            <meshStandardMaterial color="#666" roughness={0.7} />
+          </mesh>
+        </group>
+
+        {/* Clickable HTML overlay button covering the mouse body.
+            Positioned in the moving group so it follows the mouse. */}
+        <Html position={[0, 0.3, 0.15]} center distanceFactor={2.5}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              handleClick()
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            aria-label="Click mouse — navigate system"
+            title="Click to navigate the system"
+            style={{
+              width: '90px',
+              height: '90px',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              margin: 0,
+              outline: 'none',
+              borderRadius: '50%',
+              transition: 'box-shadow 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 0 24px 6px rgba(255, 176, 0, 0.5)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = 'none'
+            }}
+          />
+        </Html>
+      </group>
+    </>
   )
 }
 
@@ -741,6 +843,7 @@ export default function RetroComputerScene({
   onInsertCD,
   onCloseDocument,
   onInsertFloppy,
+  onMouseClick,
 }: {
   powered: boolean
   screenState: ScreenState
@@ -750,6 +853,7 @@ export default function RetroComputerScene({
   onInsertCD: () => void
   onCloseDocument: () => void
   onInsertFloppy: () => void
+  onMouseClick: () => void
 }) {
   return (
     <Canvas
@@ -777,7 +881,7 @@ export default function RetroComputerScene({
           <DesktopTower floppyInserted={floppyInserted} />
           <DeskSurface />
           <Keyboard />
-          <RetroMouse />
+          <RetroMouse onMouseClick={onMouseClick} />
           <CDCase onInsert={onInsertCD} />
           <FloppyDisk inserted={floppyInserted} onInsert={onInsertFloppy} />
         </group>

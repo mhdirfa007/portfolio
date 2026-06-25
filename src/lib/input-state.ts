@@ -129,3 +129,32 @@ export function fingerIdToHand(fingerId: number): { side: 'left' | 'right'; inde
   if (fingerId <= 3) return { side: 'left', index: fingerId }
   return { side: 'right', index: fingerId - 4 }
 }
+
+/* ============================================================================
+   Mouse cursor position state
+   Tracks the user's real cursor position (normalized to -1..1 range) so the
+   3D mouse on the desk can follow it. Module-level mutable object so it can
+   be read inside useFrame without triggering re-renders.
+============================================================================ */
+
+export type MousePosState = {
+  // Normalized cursor position: x in [-1, 1] (left to right), y in [-1, 1] (bottom to top)
+  // Note: browser Y is inverted (top = 0), so we flip it here.
+  x: number
+  y: number
+  // Whether the cursor is currently over the canvas
+  active: boolean
+}
+
+export const mousePosState: { current: MousePosState } = {
+  current: {
+    x: 0,
+    y: 0,
+    active: false,
+  },
+}
+
+export function updateMousePos(x: number, y: number, active: boolean) {
+  mousePosState.current = { x, y, active }
+}
+

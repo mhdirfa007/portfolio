@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useState, useEffect, useCallback } from 'react'
-import { triggerKeyPress, keyEventToKeyId, lookupKeyPress } from '@/lib/input-state'
+import { triggerKeyPress, keyEventToKeyId, lookupKeyPress, updateMousePos } from '@/lib/input-state'
 
 // Dynamically import the 3D scene to avoid SSR issues with Three.js
 const RetroComputerScene = dynamic(
@@ -72,6 +72,26 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handler)
   }, [screenState])
 
+  // ---- Mouse cursor tracking: track the cursor position (normalized to
+  // -1..1) so the 3D mouse on the desk can follow it. Always active when
+  // the monitor is powered on. ----
+  useEffect(() => {
+    if (!powered) return
+    const handler = (e: MouseEvent) => {
+      // Normalize to -1..1 range, with Y flipped (browser Y goes top→bottom)
+      const x = (e.clientX / window.innerWidth) * 2 - 1
+      const y = -((e.clientY / window.innerHeight) * 2 - 1)
+      updateMousePos(x, y, true)
+    }
+    const leaveHandler = () => updateMousePos(0, 0, false)
+    window.addEventListener('mousemove', handler)
+    window.addEventListener('mouseleave', leaveHandler)
+    return () => {
+      window.removeEventListener('mousemove', handler)
+      window.removeEventListener('mouseleave', leaveHandler)
+    }
+  }, [powered])
+
   const handleLogin = useCallback(() => {
     setScreenState('desktop')
   }, [])
@@ -96,6 +116,18 @@ export default function Home() {
   // The floppy animates flying from the desk into the drive slot.
   const handleInsertFloppy = useCallback(() => {
     setFloppyInserted(true)
+  }, [])
+
+  // 3D mouse click — primary system navigation:
+  //   On desktop  → click mouse → insert CD → Word document opens
+  //   On document → click mouse → close document → back to desktop
+  //   On other states → no-op
+  const handleMouseClick = useCallback(() => {
+    setScreenState((s) => {
+      if (s === 'desktop') return 'document'
+      if (s === 'document') return 'desktop'
+      return s
+    })
   }, [])
 
   return (
@@ -143,6 +175,7 @@ export default function Home() {
           onInsertCD={handleInsertCD}
           onCloseDocument={handleCloseDocument}
           onInsertFloppy={handleInsertFloppy}
+          onMouseClick={handleMouseClick}
         />
       </div>
 
@@ -158,9 +191,9 @@ export default function Home() {
               ? screenState === 'login'
                 ? 'TYPE ANY PASSWORD + ENTER'
                 : screenState === 'desktop'
-                ? 'CLICK THE CD CASE OR FLOPPY DISK'
+                ? 'CLICK THE MOUSE OR CD CASE TO OPEN'
                 : screenState === 'document'
-                ? 'CLICK THE CD CASE TO EJECT'
+                ? 'CLICK MOUSE / ✕ CLOSE / 🖨 PRINT'
                 : 'BOOTING...'
               : 'CLICK THE POWER BUTTON ON THE MONITOR'}
           </span>

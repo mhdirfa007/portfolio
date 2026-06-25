@@ -340,6 +340,24 @@ function DesktopScreen() {
 ---------------------------------------------------------------------------- */
 
 function ResumeDocument({ onClose }: { onClose: () => void }) {
+  // Print / download the resume as a self-contained HTML file.
+  // We generate a printable HTML document with all the resume content and
+  // trigger an automatic download. The file can be opened in any browser and
+  // printed to PDF from there if needed.
+  const handlePrint = () => {
+    const html = generatePrintableResume()
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'Mohamed_Irfan_Resume.html'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    // Revoke the URL after a short delay to ensure the download starts
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
   return (
     <div
       style={{
@@ -366,11 +384,28 @@ function ResumeDocument({ onClose }: { onClose: () => void }) {
       >
         <span style={{ fontWeight: 700 }}>📄 Word</span>
         <span style={{ opacity: 0.8 }}>| Resume.docx</span>
+        {/* Print button — downloads the resume as a printable HTML file */}
+        <button
+          onClick={handlePrint}
+          style={{
+            marginLeft: 'auto',
+            background: 'linear-gradient(180deg, #5a8ad8 0%, #3a6ab8 100%)',
+            border: '1px solid rgba(255,255,255,0.5)',
+            color: 'white',
+            padding: '3px 12px',
+            fontSize: '11px',
+            cursor: 'pointer',
+            borderRadius: '2px',
+            fontWeight: 600,
+          }}
+          title="Download resume as printable HTML"
+        >
+          🖨 Print
+        </button>
         {/* Close button */}
         <button
           onClick={onClose}
           style={{
-            marginLeft: 'auto',
             background: 'rgba(255,255,255,0.15)',
             border: '1px solid rgba(255,255,255,0.4)',
             color: 'white',
@@ -575,4 +610,132 @@ function screenBase(bg: string): React.CSSProperties {
     overflow: 'hidden',
     fontFamily: 'Segoe UI, Tahoma, sans-serif',
   }
+}
+
+/* ----------------------------------------------------------------------------
+   generatePrintableResume — produces a self-contained, print-ready HTML
+   document with the full resume content. When the Print button is clicked,
+   this HTML is downloaded as "Mohamed_Irfan_Resume.html". The file opens in
+   any browser and can be printed to PDF via Ctrl+P / Cmd+P.
+---------------------------------------------------------------------------- */
+
+function generatePrintableResume(): string {
+  const r = resume
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${r.name} — Resume</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Calibri', 'Segoe UI', 'Arial', sans-serif;
+    color: #1a1a1a;
+    background: #f0f0f0;
+    padding: 20px;
+    line-height: 1.5;
+  }
+  .page {
+    max-width: 800px;
+    margin: 0 auto;
+    background: white;
+    padding: 40px 50px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+  .header {
+    text-align: center;
+    border-bottom: 3px solid #2a5aa8;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+  .header h1 { font-size: 28px; letter-spacing: 1px; color: #1a1a1a; }
+  .header .title { font-size: 14px; color: #555; margin-top: 2px; }
+  .header .contact { font-size: 11px; color: #666; margin-top: 6px; }
+  .header .links { font-size: 11px; color: #666; margin-top: 2px; }
+  h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #2a5aa8;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 3px;
+    margin: 16px 0 8px;
+  }
+  .summary { font-size: 12px; }
+  .skills-table { width: 100%; font-size: 12px; border-collapse: collapse; }
+  .skills-table td { padding: 2px 8px 2px 0; vertical-align: top; }
+  .skills-table td.label { font-weight: 600; width: 120px; }
+  .exp-item, .proj-item { margin-bottom: 8px; font-size: 12px; }
+  .exp-item .role-line, .proj-item .name-line { font-weight: 600; }
+  .exp-item .period { float: right; color: #666; font-weight: normal; }
+  ul { margin: 2px 0 0 16px; font-size: 12px; }
+  ul li { margin-bottom: 2px; }
+  .edu-line { font-size: 12px; }
+  .edu-line .degree { font-weight: 600; }
+  .edu-line .detail { color: #555; }
+  .two-col { display: flex; gap: 24px; }
+  .two-col > div { flex: 1; }
+  @media print {
+    body { background: white; padding: 0; }
+    .page { box-shadow: none; padding: 0; max-width: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <h1>${r.name}</h1>
+    <div class="title">${r.title}</div>
+    <div class="contact">${r.contact.email} · ${r.contact.phone} · ${r.contact.location}</div>
+    <div class="links">${r.contact.github} · ${r.contact.linkedin}</div>
+  </div>
+
+  <h2>Objective</h2>
+  <div class="summary">${r.summary}</div>
+
+  <h2>Education</h2>
+  <div class="edu-line">
+    <span class="degree">${r.education.degree}</span> — ${r.education.school}
+    <span class="detail">[${r.education.period}] | ${r.education.detail}</span>
+  </div>
+
+  <h2>Skills</h2>
+  <table class="skills-table">
+    <tr><td class="label">Languages</td><td>${r.skills.languages.join(', ')}</td></tr>
+    <tr><td class="label">Frameworks</td><td>${r.skills.frameworks.join(', ')}</td></tr>
+    <tr><td class="label">Tools</td><td>${r.skills.tools.join(', ')}</td></tr>
+    <tr><td class="label">Databases</td><td>${r.skills.databases.join(', ')}</td></tr>
+  </table>
+
+  <h2>Experience</h2>
+  ${r.experience.map(exp => `
+  <div class="exp-item">
+    <div class="role-line">${exp.role} — ${exp.company}<span class="period">${exp.period}</span></div>
+    <ul>${exp.highlights.map(h => `<li>${h}</li>`).join('')}</ul>
+  </div>`).join('')}
+
+  <h2>Projects</h2>
+  ${r.projects.map(p => `
+  <div class="proj-item">
+    <div class="name-line">${p.name} <span style="font-weight:normal;color:#666">(${p.year}) — ${p.stack}</span></div>
+    <div style="color:#333">${p.description}</div>
+  </div>`).join('')}
+
+  <h2>Certifications</h2>
+  <ul>${r.certifications.map(c => `<li>${c.name} <span style="color:#666">(${c.expiry})</span></li>`).join('')}</ul>
+
+  <div class="two-col">
+    <div>
+      <h2>Achievements</h2>
+      <ul>${r.achievements.map(a => `<li>${a}</li>`).join('')}</ul>
+    </div>
+    <div>
+      <h2>Leadership</h2>
+      <ul>${r.leadership.map(l => `<li>${l}</li>`).join('')}</ul>
+    </div>
+  </div>
+</div>
+</body>
+</html>`
 }
