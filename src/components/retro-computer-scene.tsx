@@ -453,9 +453,19 @@ function RetroMouse() {
 }
 
 /* ----------------------------------------------------------------------------
-   Cartoon hands — POV (first-person) reaching toward the keyboard
-   Stylized: rounded palm, simplified fingers, long sleeves with cuffs.
-   Positioned at the bottom of the view so the viewer "is" the cartoon person.
+   Cartoon hands — POV (first-person) typing on the keyboard.
+
+   Coordinate system reminder:
+     +X = right, +Y = up, +Z = toward camera (out of screen)
+     -Z = toward the monitor (away from camera)
+   So "fingertips pointing forward toward the keyboard" means -Z direction,
+   and "palm facing down" means the palm's flat side faces -Y (down).
+
+   Hand anatomy (palm-down, fingers-forward typing pose):
+     - Palm: flat box, top at +Y, bottom (palm side) at -Y
+     - Fingers: extend in -Z direction (toward monitor), curl down at tips
+     - Thumb: on the inner side (left hand: thumb on +X side; right hand: -X)
+     - Forearm + sleeve: extends back toward camera (+Z) and down, exiting frame
 ---------------------------------------------------------------------------- */
 
 function CartoonFinger({
@@ -473,6 +483,8 @@ function CartoonFinger({
 }) {
   return (
     <mesh position={position} rotation={rotation} castShadow>
+      {/* capsuleGeometry: the cylinder part runs along the Y axis by default.
+          To make a finger point in -Z, we rotate it 90° around X. */}
       <capsuleGeometry args={[radius, length, 6, 12]} />
       <meshStandardMaterial color={color} roughness={0.7} />
     </mesh>
@@ -486,70 +498,82 @@ function CartoonHand({
   side: 'left' | 'right'
   position: [number, number, number]
 }) {
-  // Mirror for right hand
-  const s = side === 'right' ? -1 : 1
+  // For the LEFT hand: s=+1. For the RIGHT hand: s=-1 (mirrored).
+  // Thumb goes on the INNER side: left hand thumb on +X (right edge),
+  // right hand thumb on -X (left edge).
+  const s = side === 'left' ? 1 : -1
   const skinColor = '#f5c89a'
   const sleeveColor = '#5b3924' // warm brown sleeve
   const cuffColor = '#3a2415'
 
   return (
     <group position={position}>
-      {/* Forearm sleeve (angled up out of frame toward camera) */}
+      {/* ---- Forearm sleeve ----
+          Extends back toward the camera (+Z) and downward (-Y), exiting the
+          bottom of the frame. The sleeve is a capsule rotated to lie along
+          that diagonal. */}
       <mesh
-        position={[s * 0.12, -0.5, -0.15]}
-        rotation={[0.5, 0, s * 0.1]}
+        position={[0, -0.35, 0.55]}
+        rotation={[Math.PI / 2 - 0.5, 0, 0]}
         castShadow
       >
         <capsuleGeometry args={[0.22, 0.9, 8, 16]} />
         <meshStandardMaterial color={sleeveColor} roughness={0.85} />
       </mesh>
 
-      {/* Sleeve cuff */}
-      <mesh
-        position={[s * 0.06, -0.05, 0.02]}
-        rotation={[0.4, 0, s * 0.05]}
-        castShadow
-      >
-        <cylinderGeometry args={[0.24, 0.26, 0.14, 20]} />
+      {/* ---- Sleeve cuff (where the sleeve meets the wrist) ---- */}
+      <mesh position={[0, -0.05, 0.18]} rotation={[Math.PI / 2 - 0.4, 0, 0]} castShadow>
+        <cylinderGeometry args={[0.24, 0.26, 0.16, 20]} />
         <meshStandardMaterial color={cuffColor} roughness={0.7} />
       </mesh>
 
-      {/* Palm (rounded box) — sized to fit naturally over ~6 keys */}
-      <mesh position={[0, 0.02, 0]} castShadow>
+      {/* ---- Palm ----
+          Flat rounded box. Width along X, thickness along Y (thin), depth
+          along Z (palm-to-fingertip direction). Top face (+Y) is the back
+          of the hand; bottom face (-Y) is the palm side. */}
+      <mesh position={[0, 0.05, -0.05]} castShadow>
         <boxGeometry args={[0.42, 0.16, 0.45]} />
         <meshStandardMaterial color={skinColor} roughness={0.7} />
       </mesh>
-      {/* Palm top rounding (capsule to soften the cartoon look) */}
-      <mesh position={[0, 0.1, 0]} castShadow>
-        <capsuleGeometry args={[0.14, 0.22, 6, 12]} />
+      {/* Soft round top (back of hand) */}
+      <mesh position={[0, 0.14, -0.05]} castShadow>
+        <capsuleGeometry args={[0.13, 0.18, 6, 12]} />
         <meshStandardMaterial color={skinColor} roughness={0.7} />
       </mesh>
 
-      {/* Thumb (angled inward toward the keys) */}
+      {/* ---- Thumb ----
+          On the inner side of the hand (s * +X). Points forward (-Z) and
+          slightly inward. Rotated to lie mostly along -Z with a slight
+          downward curl. */}
       <CartoonFinger
-        position={[s * -0.24, 0.06, 0.12]}
-        rotation={[0.4, 0, s * -0.9]}
-        length={0.12}
+        position={[s * 0.24, 0.04, 0.05]}
+        rotation={[Math.PI / 2 + 0.3, 0, s * -0.4]}
+        length={0.18}
         radius={0.06}
         color={skinColor}
       />
 
-      {/* Four fingers spread across the top of the palm, curled forward,
-          fingertips resting on / hovering just above the keys */}
-      {[-0.14, -0.05, 0.04, 0.13].map((xOff, i) => (
-        <group key={i} position={[s * xOff, 0.16, 0.04]}>
-          {/* Base segment (knuckle → middle joint) */}
+      {/* ---- Four fingers ----
+          Spread across the front edge of the palm (negative-Z side).
+          Each finger has two segments:
+            1) Base segment: lies nearly flat, extending in -Z (forward)
+            2) Tip segment: curls downward to "press" the keys
+          The capsule is rotated +90° around X to point along Z. */}
+      {[-0.15, -0.05, 0.05, 0.15].map((xOff, i) => (
+        <group key={i} position={[xOff, 0.08, -0.25]}>
+          {/* Base segment — extends forward (in -Z) from the knuckle, mostly flat */}
           <CartoonFinger
-            position={[0, 0.06, 0]}
-            rotation={[-0.2, 0, 0]}
-            length={0.12}
-            radius={0.05}
+            position={[0, 0, -0.08]}
+            rotation={[Math.PI / 2 + 0.2, 0, 0]}
+            length={0.14}
+            radius={0.055}
             color={skinColor}
           />
-          {/* Tip segment (curled forward, fingertip pointing down at keys) */}
+          {/* Tip segment — curls DOWN toward the keys (steeper angle so
+              fingertips point mostly downward, pressing the key caps) */}
           <CartoonFinger
-            position={[0, 0.14, 0.1]}
-            rotation={[-1.3, 0, 0]}
+            position={[0, -0.08, -0.18]}
+            rotation={[Math.PI / 2 + 1.4, 0, 0]}
             length={0.1}
             radius={0.045}
             color={skinColor}
@@ -562,9 +586,14 @@ function CartoonHand({
 
 function CartoonHandsPOV() {
   return (
-    // Positioned so the fingertips rest just above the home-row keys
-    // (keyboard top surface is at y ≈ -2.55 + 0.25 + 0.1 ≈ -2.2 in world space)
-    <group position={[0, -1.95, 3.0]}>
+    // Position the hands so the fingertips rest ON the home-row keys.
+    // Keyboard is at world (0, -2.55, 2.6). Keyboard base top at y ≈ -2.4,
+    // key caps add ~0.1, so key tops are at y ≈ -2.3 around z ≈ 2.6.
+    // Fingertips need to reach y ≈ -2.3. With the hand's local geometry,
+    // fingertips end up at local y ≈ -0.2 below the hand origin. So group
+    // y ≈ -2.1 puts fingertips at world y ≈ -2.3 — right on the keys.
+    // Hands are offset in X so each palm sits over its half of the keyboard.
+    <group position={[0, -2.25, 3.0]}>
       <CartoonHand side="left" position={[-0.55, 0, 0]} />
       <CartoonHand side="right" position={[0.55, 0, 0]} />
     </group>
