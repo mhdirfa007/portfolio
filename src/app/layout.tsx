@@ -20,21 +20,21 @@ const vt323 = VT323({
 });
 
 export const metadata: Metadata = {
-  title: "Alex Carter — Portfolio Terminal",
+  title: "Mohamed Irfan — Portfolio Terminal",
   description: "A retro 3D CRT computer portfolio. Drag to rotate the rig, watch the resume boot up on the screen.",
-  keywords: ["portfolio", "3D", "retro", "CRT", "developer", "Next.js", "Three.js"],
-  authors: [{ name: "Alex Carter" }],
+  keywords: ["portfolio", "3D", "retro", "CRT", "developer", "AI", "Python", "FastAPI", "RAG", "LLM"],
+  authors: [{ name: "Mohamed Irfan" }],
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
   openGraph: {
-    title: "Alex Carter — Portfolio Terminal",
+    title: "Mohamed Irfan — Portfolio Terminal",
     description: "A retro 3D CRT computer portfolio.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Alex Carter — Portfolio Terminal",
+    title: "Mohamed Irfan — Portfolio Terminal",
     description: "A retro 3D CRT computer portfolio.",
   },
 };

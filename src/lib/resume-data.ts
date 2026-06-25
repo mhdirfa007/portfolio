@@ -15,6 +15,11 @@ export interface ResumeExperience {
   highlights: string[]
 }
 
+export interface ResumeCertification {
+  name: string
+  expiry: string
+}
+
 export interface ResumeData {
   name: string
   title: string
@@ -24,81 +29,115 @@ export interface ResumeData {
     location: string
     github: string
     linkedin: string
+    phone: string
   }
   summary: string
-  skills: string[]
+  skills: {
+    languages: string[]
+    frameworks: string[]
+    tools: string[]
+    databases: string[]
+  }
   experience: ResumeExperience[]
   projects: ResumeProject[]
   education: {
     school: string
     degree: string
     period: string
+    detail: string
   }
+  certifications: ResumeCertification[]
+  achievements: string[]
+  leadership: string[]
 }
 
 export const resume: ResumeData = {
-  name: 'ALEX CARTER',
-  title: 'Full-Stack Engineer',
-  tagline: 'I build things for the web — and occasionally for the desktop.',
+  name: 'MOHAMED IRFAN',
+  title: 'AI / Backend Developer',
+  tagline: 'B.Tech CSBS student building LLM, RAG & automation systems.',
   contact: {
-    email: 'alex.carter@example.com',
-    location: 'San Francisco, CA',
-    github: 'github.com/alexcarter',
-    linkedin: 'linkedin.com/in/alexcarter',
+    email: 'mohamedirfan.me@gmail.com',
+    phone: '+91 9842178891',
+    location: 'Tenkasi, Tamil Nadu, India',
+    github: 'github.com/mhdirfa007',
+    linkedin: 'linkedin.com/in/mohamed-irfan',
   },
   summary:
-    'Engineer with 7+ years building scalable web applications. ' +
-    'I care about clean architecture, fast UX, and shipping software that lasts. ' +
-    'Comfortable across the stack — from databases to design systems.',
-  skills: [
-    'TypeScript',
-    'React',
-    'Next.js',
-    'Node.js',
-    'Go',
-    'PostgreSQL',
-    'AWS',
-    'Docker',
-    'GraphQL',
-    'Three.js',
-  ],
+    'Final-year B.Tech (CSBS) student experienced in building backend ' +
+    'applications using Python, FastAPI, and Java. Worked on projects involving ' +
+    'LLM integration, RAG systems, and workflow automation. Eager to contribute ' +
+    'to building AI solutions that solve real-world business problems.',
+  skills: {
+    languages: ['Python', 'Java', 'SQL'],
+    frameworks: ['FastAPI', 'LangChain', 'Ollama', 'REST APIs', 'NLTK', 'TextBlob'],
+    tools: ['Git', 'GitHub', 'Postman', 'n8n', 'VS Code'],
+    databases: ['MySQL', 'ChromaDB', 'SQLite'],
+  },
   experience: [
     {
-      company: 'Helix Labs',
-      role: 'Senior Software Engineer',
-      period: '2022 — Present',
+      company: 'Zapyo Fashions (Remote)',
+      role: 'AI & Automation Intern',
+      period: 'Jul 2024',
       highlights: [
-        'Led the rebuild of the core analytics dashboard, cutting load time by 60%.',
-        'Designed a real-time event pipeline handling 5M events/day.',
-      ],
-    },
-    {
-      company: 'Northwind Software',
-      role: 'Software Engineer',
-      period: '2019 — 2022',
-      highlights: [
-        'Shipped the design-system v2 adopted across 6 product teams.',
-        'Built the billing microservice in Go, processing $20M annually.',
+        'Designed & deployed an LLM-powered customer care bot handling order queries, FAQs, and support via workflow orchestration — reducing manual support load.',
+        'Integrated REST APIs for real-time order tracking, customer interaction logging, and automated response generation — gaining hands-on exposure to production-grade API pipelines.',
       ],
     },
   ],
   projects: [
     {
-      name: 'retrospec',
-      stack: 'Next.js · WebGL · Rust',
-      year: '2025',
-      description: 'A browser-based 3D modeling tool with a node-based shader editor.',
+      name: 'RAG-Based AI Knowledge Assistant',
+      stack: 'Python · FastAPI · Ollama · LangChain · ChromaDB',
+      year: 'Jul 2025',
+      description:
+        'Retrieval-Augmented Generation system with local LLM inference, document chunking, embedding generation, and vector similarity search for context-aware responses; engineered scalable FastAPI endpoints with modular retrieval pipelines.',
     },
     {
-      name: 'telemetry-bridge',
-      stack: 'Go · Kafka · ClickHouse',
-      year: '2024',
-      description: 'A self-hostable observability gateway for distributed systems.',
+      name: 'AI Customer Support Agent',
+      stack: 'Python · FastAPI · Ollama · n8n · REST APIs',
+      year: 'Dec 2025',
+      description:
+        'LLM-powered support agent integrating REST APIs for order tracking, FAQs, and interaction logging; automated query routing & response generation via n8n workflows to reduce manual intervention.',
+    },
+    {
+      name: 'Sentiment Analyzer Pipeline',
+      stack: 'Python · n8n · NLTK · TextBlob · REST APIs',
+      year: 'Jan 2025',
+      description:
+        'End-to-end sentiment analysis pipeline with data scraping, text preprocessing, tokenization, and polarity-based classification; n8n workflow automation for continuous processing and reporting.',
     },
   ],
   education: {
-    school: 'University of California, Berkeley',
-    degree: 'B.S. in Computer Science',
-    period: '2015 — 2019',
+    school: 'Panimalar Engineering College, Poonamalle',
+    degree: 'B.Tech — Computer Science & Business Systems (CSBS)',
+    period: '2023 — 2027',
+    detail: 'CGPA: 8.3',
   },
+  certifications: [
+    {
+      name: 'Oracle Cloud Infrastructure 2025 Certified AI Foundations Associate',
+      expiry: 'Exp: Jul 2027',
+    },
+    {
+      name: 'Oracle Cloud Data Management 2023 Certified Foundations Associate',
+      expiry: 'Exp: Jul 2026',
+    },
+    {
+      name: 'RAG for Production with LangChain & LlamaIndex',
+      expiry: 'Jun 9 2026',
+    },
+    {
+      name: 'Gen AI Certification — Prepinsta Technologies PVT. LTD',
+      expiry: 'Jun 7 2026',
+    },
+  ],
+  achievements: [
+    "Winner — Intercollege 'King of Coding' competitive programming event (Spiders).",
+    'District-level football player.',
+  ],
+  leadership: [
+    'Math Club Coordinator (2024-2026)',
+    'YRC Dept Coordinator (2024-2026)',
+    'Organized PEC HACKS 3.0 (Dec 2025)',
+  ],
 }
